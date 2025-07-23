@@ -1,0 +1,6 @@
+{
+    "files.exclude": {
+        "toolchain/**": true,
+        "*.tar.gz": true,
+    }
+}
