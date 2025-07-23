@@ -1,4 +1,5 @@
 1. Information can be found here `https://gitdemo.readthedocs.io/en/latest/linux-setup.html`
+1. though the best information was here `https://docs.espressif.com/projects/esp-idf/en/v4.1.2/get-started/index.html#step-1-install-prerequisites`
 1. `wget https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-61-gab8375a-5.2.0.tar.gz`
 1. get esp-idf, place in toolchain `git clone --recursive https://github.com/espressif/esp-idf.git`
 1. `cd toolchain/esp-idf; git submodule update --init`

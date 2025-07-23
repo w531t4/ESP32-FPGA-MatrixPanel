@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "name": "ESP-IDF",
+            "compilerPath": "",
+            "includePath": [
+                "toolchain/esp-idf/components/**/include",
+                "toolchain/xtensa-esp32-elf/include",
+                "${workspaceFolder}/**"
+            ],
+            "browse": {
+                "path": [
+                    "toolchain/esp-idf/components/**/include",
+                    "toolchain/xtensa-esp32-elf/include",
+                    "${workspaceFolder}/**",
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": false
+            },
+            "compileCommands": [
+                "${workspaceFolder}/build/compile_commands.json"
+            ]
+        }
+    ],
+    "version": 4
+}
