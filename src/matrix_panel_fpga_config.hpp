@@ -105,7 +105,7 @@ struct FPGA_SPI_CFG
   // GPIO Mapping
   struct spi_pins
   {
-    int8_t ce, mosi, clk;
+    int8_t ce, clk, mosi;
     // int8_t r1, g1, b1, r2, g2, b2, a, b, c, d, e, lat, oe, clk;
   } gpio;
 
@@ -131,7 +131,7 @@ struct FPGA_SPI_CFG
       uint16_t _h = MATRIX_HEIGHT,
       uint16_t _chain = CHAIN_LENGTH,
       spi_pins _pinmap = {
-          SPI_CE_PIN_DEFAULT, SPI_MOSI_PIN_DEFAULT, SPI_CLK_PIN_DEFAULT},
+          SPI_CE_PIN_DEFAULT, SPI_CLK_PIN_DEFAULT, SPI_MOSI_PIN_DEFAULT},
     //   shift_driver _drv = SHIFTREG,
     //   bool _dbuff = false,
       clk_speed _spispeed = HZ_8M,
