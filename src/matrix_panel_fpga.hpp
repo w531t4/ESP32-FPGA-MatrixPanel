@@ -36,7 +36,6 @@ public:
   /* Propagate the DMA pin configuration, allocate DMA buffs and start data output, initially blank */
   bool begin()
   {
-
     if (initialized)
       return true; // we don't do this twice or more!
 
@@ -77,6 +76,7 @@ public:
 		return false;
 	}
 
+    init_spi(m_cfg);
     // /* As DMA buffers are dynamically allocated, we must allocated in begin()
     //  * Ref: https://github.com/espressif/arduino-esp32/issues/831
     //  */

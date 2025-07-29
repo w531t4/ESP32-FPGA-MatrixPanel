@@ -40,7 +40,7 @@ extern "C" void app_main(void) {
 
     mxconfig_.spispeed = FPGA_SPI_CFG::clk_speed::HZ_20M;
     MatrixPanel_FPGA_SPI *dma_display_ = new MatrixPanel_FPGA_SPI(mxconfig_);
-    dma_display_->init_spi(mxconfig_);
+    dma_display_->begin();
     while (true) {
         dma_display_->fillScreenRGB888(static_cast<uint8_t>(3), static_cast<uint8_t>(30), static_cast<uint8_t>(255));
         vTaskDelay(pdMS_TO_TICKS(1000));  // Delay for 3 seconds

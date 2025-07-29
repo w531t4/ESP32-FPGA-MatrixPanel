@@ -20,14 +20,14 @@ void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint
     buf[buf_len++] = b; // Blue
 
     // Send each 8-bit chunk
-    for (int i = 0; i < buf_len; i++) {
-      spi_transaction_t t = {
+    spi_transaction_t t = {
         .length = (size_t)(8*buf_len), // bits
-        .tx_buffer = &buf,
-      };
-      spi_device_transmit(spi_bus, &t); // blocking
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
     }
-
 };
 
 void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
@@ -39,12 +39,13 @@ void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
     buf[buf_len++] = g; // Green
     buf[buf_len++] = b; // Blue
     // Send each 8-bit chunk
-    for (int i = 0; i < buf_len; i++) {
-      spi_transaction_t t = {
+    spi_transaction_t t = {
         .length = (size_t)(8*buf_len), // bits
-        .tx_buffer = &buf,
-      };
-      spi_device_transmit(spi_bus, &t); // blocking
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
     }
 };
 void MatrixPanel_FPGA_SPI::clearScreen() {
@@ -54,12 +55,13 @@ void MatrixPanel_FPGA_SPI::clearScreen() {
     buf[buf_len++] = 'Z';                        // Command byte
 
     // Send each 8-bit chunk
-    for (int i = 0; i < buf_len; i++) {
-      spi_transaction_t t = {
-          .length = (size_t)(8*buf_len), // bits
-          .tx_buffer = &buf,
-      };
-      spi_device_transmit(spi_bus, &t); // blocking
+    spi_transaction_t t = {
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
     }
 };
 
@@ -72,12 +74,13 @@ void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
     buf[buf_len++] = b; // brightness
 
     // Send each 8-bit chunk
-    for (int i = 0; i < buf_len; i++) {
-      spi_transaction_t t = {
+    spi_transaction_t t = {
         .length = (size_t)(8*buf_len), // bits
-        .tx_buffer = &buf,
-      };
-      spi_device_transmit(spi_bus, &t); // blocking
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
     }
 };
 
@@ -108,13 +111,14 @@ void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, 
     buf[buf_len++] = b; // Blue
 
     // Send each 8-bit chunk
-      for (int i = 0; i < buf_len; i++) {
-          spi_transaction_t t = {
-            .length = (size_t)(8*buf_len), // bits
-            .tx_buffer = &buf,
-          };
-          spi_device_transmit(spi_bus, &t); // blocking
-      }
+    spi_transaction_t t = {
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
+    }
 };
 
 void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
@@ -137,4 +141,5 @@ void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     gpio_reset_pin((gpio_num_t)cfg.gpio.ce);
     spi_bus_initialize(HSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
     spi_bus_add_device(HSPI_HOST, &devcfg, &spi_bus);
+    initialized = true;
 }
