@@ -22,8 +22,8 @@ void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint
     // Send each 8-bit chunk
     for (int i = 0; i < buf_len; i++) {
       spi_transaction_t t = {
-          .length = 8, // bits
-          .tx_buffer = &buf[i],
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = &buf,
       };
       spi_device_transmit(spi_bus, &t); // blocking
     }
@@ -41,8 +41,8 @@ void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
     // Send each 8-bit chunk
     for (int i = 0; i < buf_len; i++) {
       spi_transaction_t t = {
-          .length = 8, // bits
-          .tx_buffer = &buf[i],
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = &buf,
       };
       spi_device_transmit(spi_bus, &t); // blocking
     }
@@ -56,8 +56,8 @@ void MatrixPanel_FPGA_SPI::clearScreen() {
     // Send each 8-bit chunk
     for (int i = 0; i < buf_len; i++) {
       spi_transaction_t t = {
-          .length = 8, // bits
-          .tx_buffer = &buf[i],
+          .length = (size_t)(8*buf_len), // bits
+          .tx_buffer = &buf,
       };
       spi_device_transmit(spi_bus, &t); // blocking
     }
@@ -74,8 +74,8 @@ void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
     // Send each 8-bit chunk
     for (int i = 0; i < buf_len; i++) {
       spi_transaction_t t = {
-          .length = 8, // bits
-          .tx_buffer = &buf[i],
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = &buf,
       };
       spi_device_transmit(spi_bus, &t); // blocking
     }
@@ -110,8 +110,8 @@ void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, 
     // Send each 8-bit chunk
       for (int i = 0; i < buf_len; i++) {
           spi_transaction_t t = {
-              .length = 8, // bits
-              .tx_buffer = &buf[i],
+            .length = (size_t)(8*buf_len), // bits
+            .tx_buffer = &buf,
           };
           spi_device_transmit(spi_bus, &t); // blocking
       }
