@@ -4,14 +4,13 @@
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "esp_system.h"
-// #include "matrix_panel_fpga.hpp"
+#include "matrix_panel_fpga.hpp"
 #include "string.h"
 
 
-// #define PIN_NUM_MOSI 13
-#define PIN_NUM_MOSI 2
-#define PIN_NUM_CLK  14
-#define PIN_NUM_CS   15
+// #define PIN_NUM_MOSI 2
+// #define PIN_NUM_CLK  14
+// #define PIN_NUM_CS   15
 // USE HSPI
 //  - MISO  - IO12 - 14 - SD_D2
 //  - MOSI  - IO13 - 16 - SD_D3
@@ -35,30 +34,30 @@ void setBrightness(spi_device_handle_t &d, uint8_t level) {
     spi_device_transmit(d, &t); // blocking
 }
 
-// FPGA_SPI_CFG mxconfig_;
-// mxconfig_->
-
 extern "C" void app_main(void) {
+    FPGA_SPI_CFG mxconfig_;
+    mxconfig_.spispeed = FPGA_SPI_CFG::clk_speed::HZ_20M;
+
     spi_bus_config_t buscfg = {
-        // .mosi_io_num = mxconfig->
+        .mosi_io_num = (gpio_num_t)mxconfig_.gpio.mosi,
         .miso_io_num = -1, // Not used
-        .sclk_io_num = PIN_NUM_CLK,
+        .sclk_io_num = (gpio_num_t)mxconfig_.gpio.clk,
         .quadwp_io_num = -1,
         .quadhd_io_num = -1,
     };
 
     spi_device_interface_config_t devcfg = {
         .mode = 0,                          // SPI mode 0
-        .clock_speed_hz = 2 * 1000 * 1000, // 10 MHz
+        .clock_speed_hz = mxconfig_.spispeed, // 10 MHz
 
-        .spics_io_num = (gpio_num_t)PIN_NUM_CS,
+        .spics_io_num = (gpio_num_t)mxconfig_.gpio.ce,
         .queue_size = 1,
     };
 
     // Initialize SPI bus and device
-    gpio_reset_pin((gpio_num_t)PIN_NUM_MOSI);
-    gpio_reset_pin((gpio_num_t)PIN_NUM_CLK);
-    gpio_reset_pin((gpio_num_t)PIN_NUM_CS);
+    gpio_reset_pin((gpio_num_t)mxconfig_.gpio.mosi);
+    gpio_reset_pin((gpio_num_t)mxconfig_.gpio.clk);
+    gpio_reset_pin((gpio_num_t)mxconfig_.gpio.ce);
     spi_bus_initialize(HSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
     spi_bus_add_device(HSPI_HOST, &devcfg, &spi);
     // gpio_set_direction(PIN_NUM_MOSI, GPIO_MODE_OUTPUT);
