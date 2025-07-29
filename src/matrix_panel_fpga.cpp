@@ -82,7 +82,7 @@ void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
 };
 
 void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
-    uint8_t buf[4];
+    uint8_t buf[10];
     uint8_t buf_len = 0;
     // x1, y1, width, hieght, capture
 
