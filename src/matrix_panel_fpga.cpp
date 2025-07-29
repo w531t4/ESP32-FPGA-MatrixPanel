@@ -2,6 +2,11 @@
 #include "driver/gpio.h"
 
 void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+    if (!initialized)
+    {
+      ESP_LOGI("drawPixelRGB888()", "Tried to set output brightness before begin()");
+      return;
+    }
     uint8_t buf[7];
     uint8_t buf_len = 0;
 
@@ -31,6 +36,11 @@ void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint
 };
 
 void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
+    if (!initialized)
+    {
+      ESP_LOGI("fillScreenRGB888()", "Tried to set output brightness before begin()");
+      return;
+    }
     uint8_t buf[4];
     uint8_t buf_len = 0;
 
@@ -49,6 +59,11 @@ void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
     }
 };
 void MatrixPanel_FPGA_SPI::clearScreen() {
+    if (!initialized)
+    {
+      ESP_LOGI("clearScreen()", "Tried to set output brightness before begin()");
+      return;
+    }
     uint8_t buf[1];
     uint8_t buf_len = 0;
 
@@ -66,6 +81,11 @@ void MatrixPanel_FPGA_SPI::clearScreen() {
 };
 
 void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
+    if (!initialized)
+    {
+      ESP_LOGI("setBrightness8()", "Tried to set output brightness before begin()");
+      return;
+    }
     uint8_t buf[2];
     uint8_t buf_len = 0;
 
@@ -85,6 +105,11 @@ void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
 };
 
 void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
+    if (!fillRect)
+    {
+      ESP_LOGI("setBrightness8()", "Tried to set output brightness before begin()");
+      return;
+    }
     uint8_t buf[10];
     uint8_t buf_len = 0;
     // x1, y1, width, hieght, capture
