@@ -4,7 +4,7 @@
 #include "driver/spi_master.h"
 #include "driver/gpio.h"
 #include "esp_system.h"
-#include "matrix_panel_fpga.hpp"
+#include "matrix_panel_fpga_config.hpp"
 #include "string.h"
 
 
