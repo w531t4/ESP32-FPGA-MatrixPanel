@@ -1,59 +1,140 @@
 #include "matrix_panel_fpga.hpp"
+#include "driver/gpio.h"
 
+void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+    uint8_t buf[7];
+    uint8_t buf_len = 0;
 
+    buf[buf_len++] = 'P';                        // Command byte
+    buf[buf_len++] = static_cast<uint8_t>(y);    // Y coordinate
 
-void MatrixPanel_FPGA_SPI::drawPixel(int16_t x, int16_t y, uint16_t color) {
+    if (x <= 0xFF) {
+        buf[buf_len++] = static_cast<uint8_t>(x);              // X (1 byte)
+    } else {
+        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);       // X LSB
+        buf[buf_len++] = static_cast<uint8_t>((x >> 8) & 0xFF); // X MSB
+    }
+
+    buf[buf_len++] = r; // Red
+    buf[buf_len++] = g; // Green
+    buf[buf_len++] = b; // Blue
+
+    // Send each 8-bit chunk
+    for (int i = 0; i < sizeof(buf_len); i++) {
+      spi_transaction_t t = {
+          .length = 8, // bits
+          .tx_buffer = &buf[i],
+      };
+      spi_device_transmit(spi_bus, &t); // blocking
+    }
 
 };
-void MatrixPanel_FPGA_SPI::fillScreen(uint16_t color) {
 
+void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
+    uint8_t buf[4];
+    uint8_t buf_len = 0;
+
+    buf[buf_len++] = 'F';                        // Command byte
+    buf[buf_len++] = r; // Red
+    buf[buf_len++] = g; // Green
+    buf[buf_len++] = b; // Blue
+    // Send each 8-bit chunk
+    for (int i = 0; i < sizeof(buf_len); i++) {
+      spi_transaction_t t = {
+          .length = 8, // bits
+          .tx_buffer = &buf[i],
+      };
+      spi_device_transmit(spi_bus, &t); // blocking
+    }
+};
+void MatrixPanel_FPGA_SPI::clearScreen() {
+    uint8_t buf[1];
+    uint8_t buf_len = 0;
+
+    buf[buf_len++] = 'Z';                        // Command byte
+
+    // Send each 8-bit chunk
+    for (int i = 0; i < sizeof(buf_len); i++) {
+      spi_transaction_t t = {
+          .length = 8, // bits
+          .tx_buffer = &buf[i],
+      };
+      spi_device_transmit(spi_bus, &t); // blocking
+    }
 };
 
-void MatrixPanel_FPGA_SPI::fillRectDMA(int16_t x_coord, int16_t y_coord, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
+void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
+    uint8_t buf[2];
+    uint8_t buf_len = 0;
 
+    buf[buf_len++] = 'T';                        // Command byte
+
+    buf[buf_len++] = b; // brightness
+
+    // Send each 8-bit chunk
+    for (int i = 0; i < sizeof(buf_len); i++) {
+      spi_transaction_t t = {
+          .length = 8, // bits
+          .tx_buffer = &buf[i],
+      };
+      spi_device_transmit(spi_bus, &t); // blocking
+    }
 };
 
-// bool MatrixPanel_I2S_DMA::begin(const HUB75_I2S_CFG &cfg)
-// {
-//   if (initialized)
-//     return true;
+void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
+    uint8_t buf[4];
+    uint8_t buf_len = 0;
+    // x1, y1, width, hieght, capture
 
-//   if (!setCfg(cfg))
-//     return false;
+    buf[buf_len++] = 'f';                        // Command byte
+    if (x <= 0xFF) {
+        buf[buf_len++] = static_cast<uint8_t>(x);              // X (1 byte)
+    } else {
+        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);       // X LSB
+        buf[buf_len++] = static_cast<uint8_t>((x >> 8) & 0xFF); // X MSB
+    }
+    buf[buf_len++] = static_cast<uint8_t>(y);    // Y coordinate
 
-//   return begin();
-// }
+    if (w <= 0xFF) {
+        buf[buf_len++] = static_cast<uint8_t>(w);              // X (1 byte)
+    } else {
+        buf[buf_len++] = static_cast<uint8_t>(w & 0xFF);       // X LSB
+        buf[buf_len++] = static_cast<uint8_t>((w >> 8) & 0xFF); // X MSB
+    }
+    buf[buf_len++] = static_cast<uint8_t>(h);    // Y coordinate
 
-// /**
-//  * @brief - update DMA buff drawing a rectangular at specified coordinates
-//  * this works much faster than multiple consecutive per-pixel calls to updateMatrixDMABuffer()
-//  * @param int16_t x, int16_t y - coordinates of a top-left corner
-//  * @param int16_t w, int16_t h - width and height of a rectangular, min is 1 px
-//  * @param uint8_t r - RGB888 colour
-//  * @param uint8_t g - RGB888 colour
-//  * @param uint8_t b - RGB888 colour
-//  */
-// void MatrixPanel_I2S_DMA::fillRectDMA(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b)
-// {
+    buf[buf_len++] = r; // Red
+    buf[buf_len++] = g; // Green
+    buf[buf_len++] = b; // Blue
 
-//   // h-lines are >2 times faster than v-lines
-//   // so will use it only for tall rects with h >2w
-//   if (h > 2 * w)
-//   {
-//     // draw using v-lines
-//     do
-//     {
-//       --w;
-//       vlineDMA(x + w, y, h, r, g, b);
-//     } while (w);
-//   }
-//   else
-//   {
-//     // draw using h-lines
-//     do
-//     {
-//       --h;
-//       hlineDMA(x, y + h, w, r, g, b);
-//     } while (h);
-//   }
-// }
+    // Send each 8-bit chunk
+      for (int i = 0; i < sizeof(buf_len); i++) {
+          spi_transaction_t t = {
+              .length = 8, // bits
+              .tx_buffer = &buf[i],
+          };
+          spi_device_transmit(spi_bus, &t); // blocking
+      }
+};
+
+void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = (gpio_num_t)cfg.gpio.mosi,
+        .miso_io_num = -1, // Not used
+        .sclk_io_num = (gpio_num_t)cfg.gpio.clk,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+    };
+    spi_device_interface_config_t devcfg = {
+        .mode = 0,                          // SPI mode 0
+        .clock_speed_hz = cfg.spispeed, // 10 MHz
+
+        .spics_io_num = (gpio_num_t)cfg.gpio.ce,
+        .queue_size = 1,
+    };
+    gpio_reset_pin((gpio_num_t)cfg.gpio.mosi);
+    gpio_reset_pin((gpio_num_t)cfg.gpio.clk);
+    gpio_reset_pin((gpio_num_t)cfg.gpio.ce);
+    spi_bus_initialize(HSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    spi_bus_add_device(HSPI_HOST, &devcfg, &spi_bus);
+}

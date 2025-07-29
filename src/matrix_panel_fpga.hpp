@@ -2,6 +2,7 @@
 #define _ESP32_RGB_64_32_MATRIX_PANEL_SPI_DMA
 #include <stdint.h>
 #include "matrix_panel_fpga_config.hpp"
+#include "driver/spi_master.h"
 
 /***************************************************************************************/
 class MatrixPanel_FPGA_SPI
@@ -31,6 +32,7 @@ public:
     setCfg(opts);
   }
 
+  void init_spi(const FPGA_SPI_CFG &cfg);
   /* Propagate the DMA pin configuration, allocate DMA buffs and start data output, initially blank */
   bool begin()
   {
@@ -119,13 +121,13 @@ public:
   bool begin(const FPGA_SPI_CFG &cfg);
 
   // Adafruit's BASIC DRAW API (565 colour format)
-  virtual void drawPixel(int16_t x, int16_t y, uint16_t color); // overwrite adafruit implementation
-  virtual void fillScreen(uint16_t color);                      // overwrite adafruit implementation
+  // virtual void drawPixel(int16_t x, int16_t y, uint32_t color); // overwrite adafruit implementation
+  // virtual void fillScreen(uint16_t color);                      // overwrite adafruit implementation
 
   /**
    * A wrapper to fill whatever selected DMA buffer / screen with black
    */
-//   inline void clearScreen() { updateMatrixDMABuffer(0, 0, 0); };
+  void clearScreen();
 
 // #ifndef NO_FAST_FUNCTIONS
 //   /**
@@ -198,13 +200,7 @@ public:
 
 //   }
   // rgb888 overload
-  virtual inline void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b)
-  {
-
-    // transform(x, y, w, h);
-    fillRectDMA(x, y, w, h, r, g, b);
-
-  }
+  void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b);
 // #endif
 
   void fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b);
@@ -251,44 +247,44 @@ public:
 
 //   }
 
-  /**
-   * @param uint8_t b - 8-bit brightness value
-   */
-  void setBrightness(const uint8_t b)
-  {
-    if (!initialized)
-    {
-      ESP_LOGI("setBrightness()", "Tried to set output brightness before begin()");
-      return;
-    }
+  // /**
+  //  * @param uint8_t b - 8-bit brightness value
+  //  */
+  // void setBrightness(const uint8_t b)
+  // {
+  //   if (!initialized)
+  //   {
+  //     ESP_LOGI("setBrightness()", "Tried to set output brightness before begin()");
+  //     return;
+  //   }
 
-    brightness = b;
-    setBrightnessOE(b, 0);
+  //   brightness = b;
+  //   setBrightnessOE(b, 0);
 
-    // if (m_cfg.double_buff)
-    // {
-    //   setBrightnessOE(b, 1);
-    // }
-  }
+  //   // if (m_cfg.double_buff)
+  //   // {
+  //   //   setBrightnessOE(b, 1);
+  //   // }
+  // }
 
-  /**
-   * @param uint8_t b - 8-bit brightness value
-   */
-  void setPanelBrightness(const uint8_t b)
-  {
-    setBrightness(b);
-  }
+  // /**
+  //  * @param uint8_t b - 8-bit brightness value
+  //  */
+  // void setPanelBrightness(const uint8_t b)
+  // {
+  //   setBrightness(b);
+  // }
 
   /**
    * this is just a wrapper to control brightness
    * with an 8-bit value (0-255), very popular in FastLED-based sketches :)
    * @param uint8_t b - 8-bit brightness value
    */
-  void setBrightness8(const uint8_t b)
-  {
-    setBrightness(b);
-    // setPanelBrightness(b * PIXELS_PER_ROW / 256);
-  }
+  virtual void setBrightness8(const uint8_t b);
+  // {
+  //   setBrightness(b);
+  //   // setPanelBrightness(b * PIXELS_PER_ROW / 256);
+  // }
 
 //   /**
 //    * @brief - Sets how many clock cycles to blank OE before/after LAT signal change
@@ -393,7 +389,7 @@ protected:
 //    * @param uint8_t g - RGB888 colour
 //    * @param uint8_t b - RGB888 colour
 //    */
-  void fillRectDMA(int16_t x_coord, int16_t y_coord, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b);
+  // void fillRectDMA(int16_t x_coord, int16_t y_coord, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b);
 // #endif
 
   // ------- PRIVATE -------
@@ -425,12 +421,12 @@ private:
 //    */
 //   // void brtCtrlOE(int brt, const bool _buff_id=0);
 
-  /**
-   * @brief - reset OE bits in DMA buffer in a way to control brightness
-   * @param brt - brightness level from 0 to row_width
-   * @param _buff_id - buffer id to control
-   */
-  void setBrightnessOE(uint8_t brt, const int _buff_id = 0);
+  // /**
+  //  * @brief - reset OE bits in DMA buffer in a way to control brightness
+  //  * @param brt - brightness level from 0 to row_width
+  //  * @param _buff_id - buffer id to control
+  //  */
+  // void setBrightnessOE(uint8_t brt, const int _buff_id = 0);
 
 //   /**
 //    * @brief - transforms coordinates according to orientation
@@ -478,6 +474,7 @@ public:
 
 protected:
 //   Bus_Parallel16 dma_bus;
+  spi_device_handle_t spi_bus;
 
 private:
 
@@ -494,9 +491,9 @@ private:
   // frameStruct frame_buffer[2];
   // frameStruct *fb; // What framebuffer we are writing pixel changes to? (pointer to either frame_buffer[0] or frame_buffer[1] basically ) used within updateMatrixDMABuffer(...)
 
-  volatile int back_buffer_id = 0;      // If using double buffer, which one is NOT active (ie. being displayed) to write too?
+  // volatile int back_buffer_id = 0;      // If using double buffer, which one is NOT active (ie. being displayed) to write too?
   int brightness = 128;        // If you get ghosting... reduce brightness level. ((60/64)*255) seems to be the limit before ghosting on a 64 pixel wide physical panel for some panels.
-  int lsbMsbTransitionBit = 0; // For colour depth calculations
+  // int lsbMsbTransitionBit = 0; // For colour depth calculations
 
   /* ESP32-HUB75-MatrixPanel-I2S-DMA functioning constants
    * we should not those once object instance initialized it's DMA structs
