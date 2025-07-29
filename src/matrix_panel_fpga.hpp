@@ -221,7 +221,7 @@ public:
     inline int16_t height() const { return m_cfg.mx_height; }
 // #endif
 
-  void drawIcon(int *ico, int16_t x, int16_t y, int16_t cols, int16_t rows);
+  // void drawIcon(int *ico, int16_t x, int16_t y, int16_t cols, int16_t rows);
 
 //   // Colour 444 is a 4 bit scale, so 0 to 15, colour 565 takes a 0-255 bit value, so scale up by 255/15 (i.e. 17)!
 //   static uint16_t color444(uint8_t r, uint8_t g, uint8_t b) { return color565(r * 17, g * 17, b * 17); }

@@ -5,6 +5,7 @@
 #include "driver/gpio.h"
 #include "esp_system.h"
 #include "matrix_panel_fpga_config.hpp"
+#include "matrix_panel_fpga.hpp"
 #include "string.h"
 
 
@@ -36,8 +37,9 @@ void setBrightness(spi_device_handle_t &d, uint8_t level) {
 
 extern "C" void app_main(void) {
     FPGA_SPI_CFG mxconfig_;
-    mxconfig_.spispeed = FPGA_SPI_CFG::clk_speed::HZ_20M;
 
+    mxconfig_.spispeed = FPGA_SPI_CFG::clk_speed::HZ_20M;
+    MatrixPanel_FPGA_SPI *dma_display_ = new MatrixPanel_FPGA_SPI(mxconfig_);
     spi_bus_config_t buscfg = {
         .mosi_io_num = (gpio_num_t)mxconfig_.gpio.mosi,
         .miso_io_num = -1, // Not used
