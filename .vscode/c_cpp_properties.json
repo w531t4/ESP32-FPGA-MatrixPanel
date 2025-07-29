@@ -1,0 +1,21 @@
+{
+    "configurations": [
+        {
+            "name": "ESP-IDF",
+            "compilerPath": "",
+            "includePath": [
+                "toolchain/esp-idf/components/**/include",
+                "${workspaceFolder}/**"
+            ],
+            "browse": {
+                "path": [
+                    "toolchain/esp-idf/components/**/include",
+                    "${workspaceFolder}/**",
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": false
+            }
+        }
+    ],
+    "version": 4
+}

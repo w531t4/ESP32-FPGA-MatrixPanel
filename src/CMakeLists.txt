@@ -2,9 +2,9 @@
 # set(COMPONENT_REQUIRES )
 # set(COMPONENT_PRIV_REQUIRES )
 
-# set(COMPONENT_SRCS "main.c")
+# set(COMPONENT_SRCS)
 # set(COMPONENT_ADD_INCLUDEDIRS "")
-idf_component_register(SRCS "main.c"
+idf_component_register(SRCS "main.cpp"
                     #    INCLUDE_DIRS "include"
                        PRIV_REQUIRES "esp_driver_spi"
                        PRIV_REQUIRES "esp_driver_gpio")
