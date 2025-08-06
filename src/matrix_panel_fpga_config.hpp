@@ -12,26 +12,6 @@
 #define SPI_CLK_PIN_DEFAULT 14
 #define SPI_MOSI_PIN_DEFAULT 2
 #define SPI_CE_PIN_DEFAULT 15
-// #define R1_PIN_DEFAULT  25
-// #define G1_PIN_DEFAULT  26
-// #define B1_PIN_DEFAULT  27
-// #define R2_PIN_DEFAULT  14
-// #define G2_PIN_DEFAULT  12
-// #define B2_PIN_DEFAULT  13
-
-// #define A_PIN_DEFAULT   23
-// #define B_PIN_DEFAULT   19
-// #define C_PIN_DEFAULT   5
-// #define D_PIN_DEFAULT   17
-// #define E_PIN_DEFAULT   -1 // IMPORTANT: Change to a valid pin if using a 64x64px panel.
-
-// #define LAT_PIN_DEFAULT 4
-// #define OE_PIN_DEFAULT  15
-// #define CLK_PIN_DEFAULT 16
-
-
-
-
 // Adapted from ESP32-HUB75-MatrixPanel-DMA/src/ESP32-HUB75-MatrixPanel-I2S-DMA.h
 
 #ifndef MATRIX_WIDTH
@@ -62,21 +42,6 @@
 struct FPGA_SPI_CFG
 {
 
-//   /**
-//    * Enumeration of hardware-specific chips
-//    * used to drive matrix modules
-//    */
-//   enum shift_driver
-//   {
-//     SHIFTREG = 0,
-//     FM6124,
-//     FM6126A,
-//     ICN2038S,
-//     MBI5124,
-//     SM5266P,
-//     DP3246_SM5368
-//   };
-
   /**
    * I2S clock speed selector
    */
@@ -106,20 +71,10 @@ struct FPGA_SPI_CFG
   struct spi_pins
   {
     int8_t ce, clk, mosi;
-    // int8_t r1, g1, b1, r2, g2, b2, a, b, c, d, e, lat, oe, clk;
   } gpio;
-
-//   // Matrix driver chip type - default is a plain shift register
-//   shift_driver driver;
-
-//   // use DMA double buffer (twice as much RAM required)
-//   bool double_buff;
 
   // SPI clock speed
   clk_speed spispeed;
-
-//   // How many clock cycles to blank OE before/after LAT signal change, default is 1 clock
-//   uint8_t latch_blanking;
 
   // Minimum refresh / scan rate needs to be configured on start due to LSBMSB_TRANSITION_BIT calculation in allocateDMAmemory()
   // Set this to '1' to get all colour depths displayed with correct BCM time weighting.
@@ -132,21 +87,14 @@ struct FPGA_SPI_CFG
       uint16_t _chain = CHAIN_LENGTH,
       spi_pins _pinmap = {
           SPI_CE_PIN_DEFAULT, SPI_CLK_PIN_DEFAULT, SPI_MOSI_PIN_DEFAULT},
-    //   shift_driver _drv = SHIFTREG,
-    //   bool _dbuff = false,
       clk_speed _spispeed = HZ_8M,
-    //   uint8_t _latblk = DEFAULT_LAT_BLANKING, // Anything > 1 seems to cause artefacts on ICS panels
-    //   bool _clockphase = true,
       uint16_t _min_refresh_rate = 60,
       uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT)
       : mx_width(_w),
         mx_height(_h),
         chain_length(_chain),
         gpio(_pinmap),
-        //driver(_drv), double_buff(_dbuff),
         spispeed(_spispeed),
-        // latch_blanking(_latblk),
-        // clkphase(_clockphase),
         min_refresh_rate(_min_refresh_rate)
   {
     setPixelColorDepthBits(_pixel_color_depth_bits);
@@ -167,7 +115,6 @@ struct FPGA_SPI_CFG
       {
         pixel_color_depth_bits = 2;
       }
-      // ESP_LOGW("HUB75_I2S_CFG", "Invalid pixel_color_depth_bits (%d): 2 <= pixel_color_depth_bits <= %d, choosing nearest valid %d", _pixel_color_depth_bits, PIXEL_COLOR_DEPTH_BITS_MAX, pixel_color_depth_bits);
     }
     else
     {
