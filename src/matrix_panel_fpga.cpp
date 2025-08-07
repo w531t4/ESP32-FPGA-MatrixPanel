@@ -2,6 +2,46 @@
 #include "driver/gpio.h"
 #include <cstring>
 
+void MatrixPanel_FPGA_SPI::drawFrameRGB888(uint8_t *data, size_t length) {
+    // Currently fails due to spi transaction size
+    if (!initialized)
+    {
+      ESP_LOGI("drawFrameRGB888()", "Tried to set output brightness before begin()");
+      return;
+    }
+    size_t expected_row_bytes = (width() * height() * 3)
+                                // + 1  // row
+                                + 1  // command
+                                ;
+    if (data == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888", "Invalid data passed to drawFrameRGB888 nullptr! (length=%d)", length);
+        return;
+    }
+
+    // uint8_t buf = 'Y';
+    uint8_t *buf = (uint8_t *) heap_caps_malloc(1, MALLOC_CAP_DMA);
+    buf[0] = 'Y';
+
+    // Send each 8-bit chunk
+    spi_transaction_t t = {
+        .length = (size_t)(8), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888", "SPI transmit failed: %s", esp_err_to_name(err));
+    }
+    heap_caps_free(buf);
+    spi_transaction_t t2 = {
+        .length = (size_t)(length*8), // bits
+        .tx_buffer = data,
+    };
+    esp_err_t err2 = spi_device_transmit(spi_bus, &t2);
+    if (err2 != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888", "SPI transmit failed: %s", esp_err_to_name(err2));
+    }
+};
+
 void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, uint8_t *data, size_t length) {
     if (!initialized)
     {
