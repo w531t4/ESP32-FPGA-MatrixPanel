@@ -2,6 +2,7 @@
 #define _ESP32_RGB_64_32_MATRIX_PANEL_SPI_DMA
 #include <stdint.h>
 #include "matrix_panel_fpga_config.hpp"
+#include "driver/gpio.h"
 #include "driver/spi_master.h"
 
 /***************************************************************************************/
@@ -40,6 +41,13 @@ public:
 	}
 
     init_spi(m_cfg);
+
+    // Reset the fpga state
+    gpio_set_direction(GPIO_NUM_4, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_4, 0);  // LOW
+    gpio_set_level(GPIO_NUM_4, 1);  // HIGH
+    gpio_set_level(GPIO_NUM_4, 0);  // LOW
+
     while (!initialized);
     if (!initialized)
     {
