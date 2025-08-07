@@ -1,5 +1,40 @@
 #include "matrix_panel_fpga.hpp"
 #include "driver/gpio.h"
+#include <cstring>
+
+void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, uint8_t *data, size_t length) {
+    if (!initialized)
+    {
+      ESP_LOGI("drawRowRGB888()", "Tried to set output brightness before begin()");
+      return;
+    }
+    size_t expected_row_bytes = (width() * 3)
+                                + 1  // row
+                                + 1  // command
+                                ;
+    if (data == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888", "Invalid data passed to drawRowRGB888 nullptr! (y=%d length=%d expected_row_bytes=%d)", y, length, expected_row_bytes);
+        return;
+    }
+
+    uint8_t buf[expected_row_bytes];
+    uint16_t buf_len = 0;
+
+    buf[buf_len++] = 'L';                        // Command byte
+    buf[buf_len++] = static_cast<uint8_t>(y);    // Y coordinate
+    memcpy(&buf[2], data, length);
+    buf_len = buf_len + length;
+
+    // Send each 8-bit chunk
+    spi_transaction_t t = {
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888", "SPI transmit failed: %s", esp_err_to_name(err));
+    }
+};
 
 void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
     if (!initialized)
