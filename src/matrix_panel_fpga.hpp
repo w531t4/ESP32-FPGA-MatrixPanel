@@ -71,6 +71,7 @@ public:
   void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
   void drawRowRGB888(const uint8_t y, uint8_t *data, size_t length);
   void drawFrameRGB888(uint8_t *data, size_t length);
+  void swapFrame();
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
   virtual void setBrightness8(const uint8_t b);

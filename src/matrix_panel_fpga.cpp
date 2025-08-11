@@ -2,6 +2,28 @@
 #include "driver/gpio.h"
 #include <cstring>
 
+void MatrixPanel_FPGA_SPI::swapFrame() {
+    if (!initialized)
+    {
+      ESP_LOGI("drawRowRGB888()", "Tried to set output brightness before begin()");
+      return;
+    }
+    uint8_t buf[1];
+    uint16_t buf_len = 0;
+
+    buf[buf_len++] = 't';                        // Command byte
+
+    // Send each 8-bit chunk
+    spi_transaction_t t = {
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888", "SPI transmit failed: %s", esp_err_to_name(err));
+    }
+};
+
 void MatrixPanel_FPGA_SPI::drawFrameRGB888(uint8_t *data, size_t length) {
     // Currently fails due to spi transaction size
     if (!initialized)
