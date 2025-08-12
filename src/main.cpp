@@ -18,8 +18,7 @@
 //  - SCK   - IO14 - 13 - SD_CLK
 //  - SS    - IO15 - 23 - SD_CMD
 
-#ifndef ESPHOME_BUILD
-extern "C" void app_main(void) { /* demo/standalone */ }
+extern "C" void blah_main(void) { /* demo/standalone */
     FPGA_SPI_CFG mxconfig_;
 
     mxconfig_.spispeed = FPGA_SPI_CFG::clk_speed::HZ_20M;
@@ -36,4 +35,3 @@ extern "C" void app_main(void) { /* demo/standalone */ }
     }
 
 }
-#endif
