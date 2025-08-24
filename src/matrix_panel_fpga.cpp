@@ -30,8 +30,8 @@ void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
       ESP_LOGI("fulfillWatchdog()", "Tried to fulfill watchdog before begin()");
       return;
     }
-    uint8_t buf[18] = "WDEADBEEFFEEBDAED"; // 'W' is the command
-    uint16_t buf_len = 17;
+    uint8_t buf[9] = {'W', 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEB, 0xDA, 0xED}; // 'W' is the command
+    uint16_t buf_len = 9;
 
 
     // Send each 8-bit chunk
