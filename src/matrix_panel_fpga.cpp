@@ -24,6 +24,27 @@ void MatrixPanel_FPGA_SPI::swapFrame() {
     }
 };
 
+void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
+    if (!initialized)
+    {
+      ESP_LOGI("fulfillWatchdog()", "Tried to fulfill watchdog before begin()");
+      return;
+    }
+    uint8_t buf[9] = {'W', 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xEB, 0xDA, 0xED}; // 'W' is the command
+    uint16_t buf_len = 9;
+
+
+    // Send each 8-bit chunk
+    spi_transaction_t t = {
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:fulfillWatchdog", "SPI transmit failed: %s", esp_err_to_name(err));
+    }
+};
+
 void MatrixPanel_FPGA_SPI::drawFrameRGB888(uint8_t *data, size_t length) {
     // Currently fails due to spi transaction size
     if (!initialized)
