@@ -201,6 +201,58 @@ void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
     }
 };
 
+void MatrixPanel_FPGA_SPI::drawRectRGB888(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t *data, size_t length) {
+    if (!initialized)
+    {
+      ESP_LOGI("setBrightness8()", "Tried to set output brightness before begin()");
+      return;
+    }
+    size_t expected_data_bytes = (w * h * 3)
+                                + 2  // x
+                                + 1  // y
+                                + 2  // width
+                                + 1  // height
+                                + 1  // command
+                                ;
+    if (data == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888", "Invalid data passed to drawRectRGB888 nullptr! (x=%d, y=%d length=%d height=%d, expected_data_bytes=%d)", x, y, length, height, expected_data_bytes);
+        return;
+    }
+    uint8_t buf[expected_data_bytes];
+    uint8_t buf_len = 0;
+    // x1, y1, width, hieght, capture
+
+    buf[buf_len++] = 'v';                        // Command byte
+    if (PIXELS_PER_ROW <= 0xff) {
+        buf[buf_len++] = static_cast<uint8_t>(x);              // X (1 byte)
+    } else {
+        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);       // X LSB
+        buf[buf_len++] = static_cast<uint8_t>((x >> 8) & 0xFF); // X MSB
+    }
+    buf[buf_len++] = static_cast<uint8_t>(y);    // Y coordinate
+
+
+    if (PIXELS_PER_ROW <= 0xff) {
+        buf[buf_len++] = static_cast<uint8_t>(w);              // X (1 byte)
+    } else {
+        buf[buf_len++] = static_cast<uint8_t>(w & 0xFF);       // X LSB
+        buf[buf_len++] = static_cast<uint8_t>((w >> 8) & 0xFF); // X MSB
+    }
+    buf[buf_len++] = static_cast<uint8_t>(h);    // Y coordinate
+
+    memcpy(&buf[buf_len], data, length);
+    buf_len = buf_len + length;
+
+    // Send each 8-bit chunk
+    spi_transaction_t t = {
+        .length = (size_t)(8*buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
+    }
+}
 void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
     if (!initialized)
     {
