@@ -277,6 +277,7 @@ void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
         .clock_speed_hz = cfg.spispeed, // 10 MHz
 
         .spics_io_num = (gpio_num_t)cfg.gpio.ce,
+        .flags = SPI_DEVICE_NO_DUMMY,
         .queue_size = 1,
     };
     gpio_reset_pin((gpio_num_t)cfg.gpio.mosi);
