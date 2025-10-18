@@ -42,6 +42,7 @@ public:
 
     init_spi(m_cfg);
 
+    start_worker();
     // Reset the fpga state
     gpio_set_direction((gpio_num_t) m_cfg.gpio.fpga_reset, GPIO_MODE_OUTPUT);
     gpio_set_level((gpio_num_t) m_cfg.gpio.fpga_reset, 0);  // LOW
@@ -69,13 +70,14 @@ public:
   void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b);
   void fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b);
   void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
-  void drawRowRGB888(const uint8_t y, uint8_t *data, size_t length);
-  void drawFrameRGB888(uint8_t *data, size_t length);
+  void drawRowRGB888(const uint8_t y, const uint8_t *data, size_t length);
+  void drawFrameRGB888(const uint8_t *data, size_t length);
   void swapFrame();
   void fulfillWatchdog();
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
   virtual void setBrightness8(const uint8_t b);
+  virtual void do_setBrightness8_(const uint8_t b);
   const FPGA_SPI_CFG &getCfg() const { return m_cfg; };
 
   inline bool setCfg(const FPGA_SPI_CFG &cfg)
@@ -109,6 +111,14 @@ protected:
 
 private:
 
+  void do_clearScreen_();
+  void do_fillRect_(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b);
+  void do_fillScreenRGB888_(uint8_t r, uint8_t g, uint8_t b);
+  void do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
+  void do_drawRowRGB888_(const uint8_t y, const uint8_t *data, size_t length);
+  void do_drawFrameRGB888_(const uint8_t *data, size_t length);
+  void do_swapFrame_();
+  void do_fulfillWatchdog_();
   // Matrix i2s settings
   FPGA_SPI_CFG m_cfg;
 
@@ -121,6 +131,50 @@ private:
   bool initialized = false;
   bool config_set = false;
 
+    enum class Op : uint8_t { DRAW_ROW, SWAP, WATCHDOG, FILL_SCREEN, SET_BRIGHTNESS, CLEAR, DRAW_FRAME, DRAW_PIXEL, FILL_RECT };
+    struct Job {
+        Op op;
+        const uint8_t *data = nullptr;  // for DRAW_ROW / DRAW_FRAME
+        size_t length = 0;              // for DRAW_ROW / DRAW_FRAME
+
+        uint8_t y = 0;                  // row index
+        int16_t x = 0;                  // for DRAW_PIXEL / FILL_RECT
+        int16_t w = 0;                  // for FILL_RECT
+        int16_t h = 0;                  // for FILL_RECT
+
+        uint8_t r = 0, g = 0, b = 0;    // for colors (FILL_SCREEN / DRAW_PIXEL / FILL_RECT)
+        uint8_t u8 = 0;                 // for SET_BRIGHTNESS
+    };
+    bool use_worker_ = false;
+    uint32_t worker_core_ = 0;
+    TaskHandle_t tx_task_ = nullptr;
+    QueueHandle_t tx_q_ = nullptr;
+    static void tx_task_entry_(void *arg) { static_cast<MatrixPanel_FPGA_SPI*>(arg)->tx_task_run_(); }
+    void tx_task_run_() {
+        // ESP_LOGI("cpu_probe","core=%d", xPortGetCoreID());
+        Job j;
+        for (;;) {
+            if (xQueueReceive(tx_q_, &j, portMAX_DELAY) != pdTRUE) continue;
+            if (j.op == Op::DRAW_ROW) do_drawRowRGB888_(j.y, j.data, j.length);
+            else if (j.op == Op::SWAP) do_swapFrame_();
+            else if (j.op == Op::WATCHDOG) do_fulfillWatchdog_();
+            else if (j.op == Op::FILL_SCREEN) do_fillScreenRGB888_(j.r, j.g, j.b);
+            else if (j.op == Op::SET_BRIGHTNESS) do_setBrightness8_(j.u8);
+            else if (j.op == Op::CLEAR) do_clearScreen_();
+            else if (j.op == Op::DRAW_FRAME) do_drawFrameRGB888_(j.data, j.length);
+            else if (j.op == Op::DRAW_PIXEL) do_drawPixelRGB888_(j.x, j.y, j.r, j.g, j.b);
+            else if (j.op == Op::FILL_RECT)  do_fillRect_(j.x, j.y, j.w, j.h, j.r, j.g, j.b);
+        }
+    }
+    static constexpr UBaseType_t TX_TASK_PRIO = 2;   // was 3
+public:
+    void set_worker_core(uint32_t core) { worker_core_ = core; }
+    void enable_worker(bool on) { use_worker_ = on; }
+    void start_worker() {
+        if (!use_worker_) return;
+        if (!tx_q_) tx_q_ = xQueueCreate(34, sizeof(Job));
+        if (!tx_task_) xTaskCreatePinnedToCore(tx_task_entry_, "mp_spi_tx", 4096, this, TX_TASK_PRIO, &tx_task_, worker_core_);
+    }
 };
 
 #endif

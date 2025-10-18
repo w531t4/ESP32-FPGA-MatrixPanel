@@ -2,7 +2,7 @@
 #include "driver/gpio.h"
 #include <cstring>
 
-void MatrixPanel_FPGA_SPI::swapFrame() {
+void MatrixPanel_FPGA_SPI::do_swapFrame_() {
     if (!initialized)
     {
       ESP_LOGI("drawRowRGB888()", "Tried to set output brightness before begin()");
@@ -24,7 +24,17 @@ void MatrixPanel_FPGA_SPI::swapFrame() {
     }
 };
 
-void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
+void MatrixPanel_FPGA_SPI::swapFrame() {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;  // drop until worker is ready
+        Job j; j.op = Op::SWAP;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_swapFrame_();
+}
+
+void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
     if (!initialized)
     {
       ESP_LOGI("fulfillWatchdog()", "Tried to fulfill watchdog before begin()");
@@ -45,7 +55,17 @@ void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
     }
 };
 
-void MatrixPanel_FPGA_SPI::drawFrameRGB888(uint8_t *data, size_t length) {
+void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;  // drop until worker is ready
+        Job j; j.op = Op::WATCHDOG;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_fulfillWatchdog_();
+}
+
+void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data, size_t length) {
     // Currently fails due to spi transaction size
     if (!initialized)
     {
@@ -85,7 +105,17 @@ void MatrixPanel_FPGA_SPI::drawFrameRGB888(uint8_t *data, size_t length) {
     }
 };
 
-void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, uint8_t *data, size_t length) {
+void MatrixPanel_FPGA_SPI::drawFrameRGB888(const uint8_t *data, size_t length) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;  // drop until worker is ready
+        Job j; j.op = Op::DRAW_FRAME; j.data = data; j.length = length;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_drawFrameRGB888_(data, length);
+}
+
+void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y, const uint8_t *data, size_t length) {
     if (!initialized)
     {
       ESP_LOGI("drawRowRGB888()", "Tried to set output brightness before begin()");
@@ -119,7 +149,17 @@ void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, uint8_t *data, size_t 
     }
 };
 
-void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, const uint8_t *data, size_t length) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;
+        Job j; j.op = Op::DRAW_ROW; j.y = y; j.data = data; j.length = length;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_drawRowRGB888_(y, data, length);
+}
+
+void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
     if (!initialized)
     {
       ESP_LOGI("drawPixelRGB888()", "Tried to set output brightness before begin()");
@@ -153,7 +193,17 @@ void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint
     }
 };
 
-void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
+void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;
+        Job j; j.op = Op::DRAW_PIXEL; j.x = x; j.y = (uint8_t)y; j.r = r; j.g = g; j.b = b;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_drawPixelRGB888_(x, y, r, g, b);
+}
+
+void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g, uint8_t b) {
     if (!initialized)
     {
       ESP_LOGI("fillScreenRGB888()", "Tried to set output brightness before begin()");
@@ -176,7 +226,18 @@ void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s", esp_err_to_name(err));
     }
 };
-void MatrixPanel_FPGA_SPI::clearScreen() {
+
+void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;
+        Job j; j.op = Op::FILL_SCREEN; j.r = r; j.g = g; j.b = b;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_fillScreenRGB888_(r, g, b);
+}
+
+void MatrixPanel_FPGA_SPI::do_clearScreen_() {
     if (!initialized)
     {
       ESP_LOGI("clearScreen()", "Tried to set output brightness before begin()");
@@ -198,7 +259,17 @@ void MatrixPanel_FPGA_SPI::clearScreen() {
     }
 };
 
-void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
+void MatrixPanel_FPGA_SPI::clearScreen() {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;
+        Job j; j.op = Op::CLEAR;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_clearScreen_();
+}
+
+void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
     if (!initialized)
     {
       ESP_LOGI("setBrightness8()", "Tried to set output brightness before begin()");
@@ -222,7 +293,17 @@ void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
     }
 };
 
-void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
+void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;
+        Job j; j.op = Op::SET_BRIGHTNESS; j.u8 = b;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_setBrightness8_(b);
+}
+
+void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
     if (!initialized)
     {
       ESP_LOGI("setBrightness8()", "Tried to set output brightness before begin()");
@@ -264,7 +345,18 @@ void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, 
     }
 };
 
+void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r, uint8_t g, uint8_t b) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_) return;
+        Job j; j.op = Op::FILL_RECT; j.x = x; j.y = (uint8_t)y; j.w = w; j.h = h; j.r = r; j.g = g; j.b = b;
+        (void) xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_fillRect_(x, y, w, h, r, g, b);
+}
+
 void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
+    ESP_LOGD("spi_init","using core=%d", xPortGetCoreID());
     spi_bus_config_t buscfg = {
         .mosi_io_num = (gpio_num_t)cfg.gpio.mosi,
         .miso_io_num = -1, // Not used
@@ -286,4 +378,5 @@ void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     spi_bus_initialize(HSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
     spi_bus_add_device(HSPI_HOST, &devcfg, &spi_bus);
     initialized = true;
+    ESP_LOGD("spi_init","done");
 }
