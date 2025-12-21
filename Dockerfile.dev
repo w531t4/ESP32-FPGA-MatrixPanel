@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2025 Aaron White <w531t4@gmail.com>
+# SPDX-License-Identifier: MIT
+FROM mcr.microsoft.com/vscode/devcontainers/base:bookworm
+
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ARG VERIBLE_VERSION
+ARG TARGETARCH
+
+RUN \
+    apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        git \
+        cmake \
+        autoconf \
+        libreadline-dev \
+        libffi-dev \
+        pre-commit \
+        reuse \
+        # needed by esp-idf install.sh
+        libusb-1.0-0-dev \
+        python3-venv \
+    && mkdir -p /opt/esp/idf \
+    && chmod 777 /opt/esp \
+    && chmod 777 /opt/esp/idf \
+    && apt-get clean \
+
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src
+
+# COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+USER vscode
+
+RUN git clone \
+        --depth 1 \
+        --single-branch \
+        --branch release/v5.5 \
+        --recurse-submodules \
+        --shallow-submodules \
+        --jobs 8 \
+        https://github.com/espressif/esp-idf.git /opt/esp/idf \
+    && git config --global --add safe.directory /opt/esp/idf \
+    && /opt/esp/idf/install.sh --disable-ci --disable-docs \
+    && rm -rf /opt/esp/idf/.git \
+    && echo 'source /opt/esp/idf/export.sh' >> ~/.bashrc
+
+# ENV VIRTUAL_ENV="/home/vscode/.local/venv"
+# RUN --mount=type=bind,source=.python-version,target=.python-version \
+#     uv python install \
+#     && uv venv $VIRTUAL_ENV
+# ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+    # && rm -rf /opt/esp/idf/.git /opt/esp/idf/docs /opt/esp/idf/examples \
+    # && rm -rf ~/.cache/pip \
+
+# RUN --mount=type=bind,source=.python-requirements,target=.python-requirements \
+#     uv pip install -r .python-requirements
+
+WORKDIR /workspaces
+
+# Set the default shell to bash instead of sh
+ENV SHELL=/bin/bash

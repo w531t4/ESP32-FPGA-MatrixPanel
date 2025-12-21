@@ -4,22 +4,16 @@
             "name": "ESP-IDF",
             "compilerPath": "",
             "includePath": [
-                "toolchain/esp-idf/components/**/include",
-                "toolchain/xtensa-esp32-elf/include",
-                "${workspaceFolder}/**"
+                "/opt/esp/idf/components/**/include",
+                "${env:HOME}/.espressif/tools/xtensa-esp32-elf/include"
             ],
             "browse": {
                 "path": [
-                    "toolchain/esp-idf/components/**/include",
-                    "toolchain/xtensa-esp32-elf/include",
-                    "${workspaceFolder}/**",
-                    "${workspaceFolder}"
+                    "/opt/esp/idf/components/**/include",
+                    "${env:HOME}/.espressif/tools/xtensa-esp32-elf/include"
                 ],
                 "limitSymbolsToIncludedHeaders": false
             },
-            "compileCommands": [
-                "${workspaceFolder}/build/compile_commands.json"
-            ]
         }
     ],
     "version": 4
