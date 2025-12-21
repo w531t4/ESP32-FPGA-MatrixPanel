@@ -1,0 +1,20 @@
+version = 1
+
+[[annotations]]
+path = [
+    ".clang-format",
+    ".vscode/c_cpp_properties.json",
+    ".vscode/settings.json",
+    "README.md"
+
+]
+SPDX-FileCopyrightText = "2025 Aaron White <w531t4@gmail.com>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = [
+    "sdkconfig"
+
+]
+SPDX-FileCopyrightText = "NONE"
+SPDX-License-Identifier = "CC0-1.0"

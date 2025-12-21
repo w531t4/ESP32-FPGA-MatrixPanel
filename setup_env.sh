@@ -1,4 +1,4 @@
 #!/bin/bash
-#export IDF_PATH=$(pwd)/toolchain/esp-idf
-# echo set IDF_PATH to ${IDF_PATH}
+# SPDX-FileCopyrightText: 2025 Aaron White <w531t4@gmail.com>
+# SPDX-License-Identifier: MIT
 . toolchain/esp-idf/export.sh
