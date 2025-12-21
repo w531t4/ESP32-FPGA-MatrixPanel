@@ -1,19 +1,19 @@
 {
     "files.exclude": {
-        "toolchain/**": true,
-        "*.tar.gz": true,
-        ".esphome": true,
-        ".pytest_cache": true,
-        "build": true,
-        "doc": true,
-        "src/Kconfig*": true,
-        "**/CMakeLists.txt": true,
-        "LICENSE": true,
-        "sdkconfig": true,
-        "Makefile": true,
-        "README.md": true,
-        "src/main.cpp": true,
-        "src/component.mk": true,
+        // "toolchain/**": true,
+        // "*.tar.gz": true,
+        // ".esphome": true,
+        // ".pytest_cache": true,
+        // "build": true,
+        // "doc": true,
+        // "src/Kconfig*": true,
+        // "**/CMakeLists.txt": true,
+        // "LICENSE": true,
+        // "sdkconfig": true,
+        // "Makefile": true,
+        // "README.md": true,
+        // "src/main.cpp": true,
+        // "src/component.mk": true,
 
 
     }

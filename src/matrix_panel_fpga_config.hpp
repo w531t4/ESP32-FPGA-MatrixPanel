@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2018-2032 Faptastic
+// SPDX-FileCopyrightText: 2025 Aaron White <w531t4@gmail.com>
+// SPDX-License-Identifier: MIT
 #ifndef _ESP32_RGB_64_32_MATRIX_PANEL_SPI_CONFIG
 #define _ESP32_RGB_64_32_MATRIX_PANEL_SPI_CONFIG
 
