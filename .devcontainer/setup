@@ -16,3 +16,5 @@ if [ ! -f "$SETTINGS_FILE" ]; then
 fi
 
 .devcontainer/bootstrap
+
+pre-commit install

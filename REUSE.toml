@@ -5,6 +5,8 @@ path = [
     ".clang-format",
     ".vscode/c_cpp_properties.json",
     ".vscode/settings.json",
+    ".devcontainer/devcontainer.json",
+    ".pre-commit-config.yaml",
     "README.md"
 
 ]
