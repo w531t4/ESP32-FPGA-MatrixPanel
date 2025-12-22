@@ -1,0 +1,25 @@
+{
+    "name": "ESP32-FPGA-MatrixPanel",
+    "version": "0.0.1",
+    "description": "C++ driver for operating fpga_led_display via SPI.",
+    "keywords": "hub75, esp32, spi, fpga, rgb matrix",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/w531t4/ESP32-FPGA-MatrixPanel.git"
+    },
+    "authors": {
+        "name": "w531t4",
+        "url": "https://github.com/w531t4/"
+    },
+    "frameworks": [
+        "espidf"
+    ],
+    "platforms": [
+        "espressif32"
+    ],
+    "headers": [
+        "matrix_panel_fpga.hpp", "matrix_panel_fpga_config.hpp"
+    ],
+    "examples": [
+    ]
+}
