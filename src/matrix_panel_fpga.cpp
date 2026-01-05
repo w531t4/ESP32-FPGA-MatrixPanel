@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: MIT
 #include "matrix_panel_fpga.hpp"
 #include "driver/gpio.h"
+#include "esp_attr.h"
 #include <cstring>
+
+void IRAM_ATTR MatrixPanel_FPGA_SPI::fpga_ready_isr_(void *arg) {
+    auto *self = static_cast<MatrixPanel_FPGA_SPI *>(arg);
+    self->fpga_reset_seen_ = true;
+}
 
 void MatrixPanel_FPGA_SPI::do_swapFrame_() {
     if (!initialized) {
@@ -76,6 +82,76 @@ void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
         return;
     }
     do_fulfillWatchdog_();
+}
+
+void MatrixPanel_FPGA_SPI::init_fpga_ready_gpio_() {
+    if (m_cfg.gpio.fpga_ready < 0)
+        return;
+    fpga_ready_configured_ = true;
+    gpio_reset_pin((gpio_num_t)m_cfg.gpio.fpga_ready);
+    gpio_set_direction((gpio_num_t)m_cfg.gpio.fpga_ready, GPIO_MODE_INPUT);
+
+    static bool isr_service_installed = false;
+    if (!isr_service_installed) {
+        esp_err_t err = gpio_install_isr_service(0);
+        if (err == ESP_OK || err == ESP_ERR_INVALID_STATE) {
+            isr_service_installed = true;
+        } else {
+            ESP_LOGE("fpga_ready", "ISR service install failed: %s",
+                     esp_err_to_name(err));
+        }
+    }
+    if (isr_service_installed) {
+        gpio_set_intr_type((gpio_num_t)m_cfg.gpio.fpga_ready,
+                           GPIO_INTR_NEGEDGE);
+        esp_err_t err = gpio_isr_handler_add(
+            (gpio_num_t)m_cfg.gpio.fpga_ready,
+            &MatrixPanel_FPGA_SPI::fpga_ready_isr_, this);
+        if (err != ESP_OK) {
+            ESP_LOGE("fpga_ready", "ISR attach failed: %s",
+                     esp_err_to_name(err));
+        }
+    }
+    if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_ready) == 0) {
+        fpga_reset_seen_ = true;
+    }
+}
+
+bool MatrixPanel_FPGA_SPI::consume_fpga_reset() {
+    if (!fpga_ready_configured_)
+        return false;
+    if (!fpga_reset_seen_)
+        return false;
+    if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_ready) == 0)
+        return false;
+    fpga_reset_seen_ = false;
+    reset_epoch_++;
+    return true;
+}
+
+void MatrixPanel_FPGA_SPI::resync_after_fpga_reset(uint8_t brightness) {
+    if (!initialized) {
+        ESP_LOGI("resync_after_fpga_reset()",
+                 "Tried to resync before begin()");
+        return;
+    }
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_)
+            return;
+        xQueueReset(tx_q_);
+        Job j;
+        j.op = Op::CLEAR;
+        (void)xQueueSend(tx_q_, &j, 0);
+        j.op = Op::SET_BRIGHTNESS;
+        j.u8 = brightness;
+        (void)xQueueSend(tx_q_, &j, 0);
+        j.op = Op::SWAP;
+        (void)xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_clearScreen_();
+    do_setBrightness8_(brightness);
+    do_swapFrame_();
 }
 
 void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
