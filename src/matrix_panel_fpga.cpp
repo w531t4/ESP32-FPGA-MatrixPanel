@@ -78,6 +78,31 @@ void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
     do_fulfillWatchdog_();
 }
 
+void MatrixPanel_FPGA_SPI::resync_after_fpga_reset(uint8_t brightness) {
+    if (!initialized) {
+        ESP_LOGI("resync_after_fpga_reset()",
+                 "Tried to resync before begin()");
+        return;
+    }
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_)
+            return;
+        xQueueReset(tx_q_);
+        Job j;
+        j.op = Op::CLEAR;
+        (void)xQueueSend(tx_q_, &j, 0);
+        j.op = Op::SET_BRIGHTNESS;
+        j.u8 = brightness;
+        (void)xQueueSend(tx_q_, &j, 0);
+        j.op = Op::SWAP;
+        (void)xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_clearScreen_();
+    do_setBrightness8_(brightness);
+    do_swapFrame_();
+}
+
 void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
                                                size_t length) {
     // Currently fails

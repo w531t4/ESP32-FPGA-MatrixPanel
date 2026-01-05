@@ -74,6 +74,7 @@ class MatrixPanel_FPGA_SPI {
     void drawFrameRGB888(const uint8_t *data, size_t length);
     void swapFrame();
     void fulfillWatchdog();
+    void resync_after_fpga_reset(uint8_t brightness);
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
     virtual void setBrightness8(const uint8_t b);
@@ -120,10 +121,6 @@ class MatrixPanel_FPGA_SPI {
     void do_fulfillWatchdog_();
     // Matrix i2s settings
     FPGA_SPI_CFG m_cfg;
-
-    int brightness = 128; // If you get ghosting... reduce brightness level.
-                          // ((60/64)*255) seems to be the limit before ghosting
-                          // on a 64 pixel wide physical panel for some panels.
 
     uint16_t PIXELS_PER_ROW =
         m_cfg.mx_width *
