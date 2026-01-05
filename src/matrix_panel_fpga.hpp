@@ -41,6 +41,7 @@ class MatrixPanel_FPGA_SPI {
         }
 
         init_spi(m_cfg);
+        init_fpga_ready_gpio_();
 
         start_worker();
         // Reset the fpga state
@@ -75,6 +76,8 @@ class MatrixPanel_FPGA_SPI {
     void swapFrame();
     void fulfillWatchdog();
     void resync_after_fpga_reset(uint8_t brightness);
+    bool consume_fpga_reset();
+    uint32_t get_reset_epoch() const { return reset_epoch_; }
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
     virtual void setBrightness8(const uint8_t b);
@@ -119,6 +122,8 @@ class MatrixPanel_FPGA_SPI {
     void do_drawFrameRGB888_(const uint8_t *data, size_t length);
     void do_swapFrame_();
     void do_fulfillWatchdog_();
+    void init_fpga_ready_gpio_();
+    static void fpga_ready_isr_(void *arg);
     // Matrix i2s settings
     FPGA_SPI_CFG m_cfg;
 
@@ -132,6 +137,9 @@ class MatrixPanel_FPGA_SPI {
     // Other private variables
     bool initialized = false;
     bool config_set = false;
+    bool fpga_ready_configured_ = false;
+    volatile bool fpga_reset_seen_ = false;
+    uint32_t reset_epoch_ = 0;
 
     enum class Op : uint8_t {
         DRAW_ROW,
