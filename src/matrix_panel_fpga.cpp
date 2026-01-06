@@ -3,6 +3,10 @@
 #include "matrix_panel_fpga.hpp"
 #include "driver/gpio.h"
 #include "esp_attr.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include <algorithm>
+#include <vector>
 #include <cstring>
 
 void IRAM_ATTR MatrixPanel_FPGA_SPI::fpga_ready_isr_(void *arg) {
@@ -521,6 +525,96 @@ void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
         return;
     }
     do_fillRect_(x, y, w, h, r, g, b);
+}
+
+void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
+    if (!initialized) {
+        ESP_LOGW("MatrixPanel_FPGA_SPI",
+                 "run_test_graphic() called before begin()");
+        return;
+    }
+
+    const TickType_t delay_ticks =
+        pdMS_TO_TICKS(delay_ms > 0 ? delay_ms : 0);
+    const auto delay_if_needed = [&]() {
+        if (delay_ticks > 0) {
+            vTaskDelay(delay_ticks);
+        }
+    };
+
+    // Summary: expect the following visible elements in order:
+    // - neutral grey background
+    // - red top band drawn through drawRowRGB888
+    // - green bottom band via fillRect
+    // - blue center band via fillRect
+    // - magenta left column, yellow right column for edge accents
+    // - opposing diagonals (white/orange) to cover drawPixelRGB888
+    // - brightness pushed to 255 and the frame swapped to display the pattern
+    clearScreen();
+    delay_if_needed();
+    // Fill a neutral grey so the bright accents stand out.
+    fillScreenRGB888(0x18, 0x18, 0x18);
+    delay_if_needed();
+
+    const int width = this->width();
+    const int height = this->height();
+    const int horizontal_band_height =
+        std::min(height, std::max(1, height / 12));
+    const int vertical_bar_width =
+        std::min(width, std::max(1, width / 16));
+
+    const size_t row_bytes = static_cast<size_t>(width) * 3;
+    std::vector<uint8_t> red_row(row_bytes);
+    // Prepare a solid red row buffer for drawRowRGB888.
+    for (int x = 0; x < width; ++x) {
+        const size_t idx = static_cast<size_t>(x) * 3;
+        red_row[idx] = 0xFF;
+        red_row[idx + 1] = 0x00;
+        red_row[idx + 2] = 0x00;
+    }
+    // Draw the red top band with drawRowRGB888 so this code path is exercised.
+    for (int y = 0; y < horizontal_band_height; ++y) {
+        drawRowRGB888(static_cast<uint8_t>(y), red_row.data(), row_bytes);
+        delay_if_needed();
+    }
+
+    // Bottom band: green stripe using fillRect.
+    fillRect(0, height - horizontal_band_height, width, horizontal_band_height,
+             0x00, 0xFF, 0x00);
+    delay_if_needed();
+
+    // Middle band: blue stripe centered vertically.
+    const int middle_y =
+        std::max(0, (height / 2) - (horizontal_band_height / 2));
+    fillRect(0, middle_y, width, horizontal_band_height, 0x00, 0x00, 0xFF);
+    delay_if_needed();
+
+    // Left accent column: magenta/pink.
+    fillRect(0, 0, vertical_bar_width, height, 0xFF, 0xFF, 0x33);
+    delay_if_needed();
+
+    // Right accent column: yellow.
+    fillRect(std::max(width - vertical_bar_width, 0), 0, vertical_bar_width, height,
+             0xFF, 0x00, 0xFF);
+    delay_if_needed();
+
+    // Diagonals: white from top-left and orange from top-right.
+    const int diag_length = std::min(width, height);
+    const int diag_step = std::max(1, diag_length / 16);
+    for (int i = 0; i < diag_length; i += diag_step) {
+        drawPixelRGB888(i, i, 0xFF, 0xFF, 0xFF);
+        delay_if_needed();
+        drawPixelRGB888(width - 1 - i, i, 0xFF, 0x80, 0x00);
+        delay_if_needed();
+    }
+
+    // Force full brightness so the bands are vivid.
+    setBrightness8(255);
+    delay_if_needed();
+
+    // Swap the frame so the constructed graphic becomes visible.
+    swapFrame();
+    delay_if_needed();
 }
 
 void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
