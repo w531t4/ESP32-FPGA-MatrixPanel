@@ -73,6 +73,7 @@ class MatrixPanel_FPGA_SPI {
     void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
     void drawRowRGB888(const uint8_t y, const uint8_t *data, size_t length);
     void drawFrameRGB888(const uint8_t *data, size_t length);
+    void run_test_graphic(uint32_t delay_ms = 10);
     void swapFrame();
     void fulfillWatchdog();
     void resync_after_fpga_reset(uint8_t brightness);
