@@ -602,9 +602,9 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     const int diag_length = std::min(width, height);
     const int diag_step = std::max(1, diag_length / 16);
     for (int i = 0; i < diag_length; i += diag_step) {
-        drawPixelRGB888(i, i, 0xFF, 0xFF, 0xFF);
+        drawPixelRGB888(i, i, 0xFF, 0x80, 0x00);
         delay_if_needed();
-        drawPixelRGB888(width - 1 - i, i, 0xFF, 0x80, 0x00);
+        drawPixelRGB888(width - 1 - i, i, 0xFF, 0xFF, 0xFF);
         delay_if_needed();
     }
 
