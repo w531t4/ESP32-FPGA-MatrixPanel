@@ -298,8 +298,8 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
     if (PIXELS_PER_ROW <= 0xff) {
         buf[buf_len++] = static_cast<uint8_t>(x); // X (1 byte)
     } else {
-        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);        // X LSB
         buf[buf_len++] = static_cast<uint8_t>((x >> 8) & 0xFF); // X MSB
+        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);        // X LSB
     }
 
     buf[buf_len++] = r; // Red
@@ -475,8 +475,8 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
     if (PIXELS_PER_ROW <= 0xff) {
         buf[buf_len++] = static_cast<uint8_t>(x); // X (1 byte)
     } else {
-        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);        // X LSB
         buf[buf_len++] = static_cast<uint8_t>((x >> 8) & 0xFF); // X MSB
+        buf[buf_len++] = static_cast<uint8_t>(x & 0xFF);        // X LSB
     }
     buf[buf_len++] = static_cast<uint8_t>(y); // Y
                                               // coordinate
@@ -484,8 +484,8 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
     if (PIXELS_PER_ROW <= 0xff) {
         buf[buf_len++] = static_cast<uint8_t>(w); // X (1 byte)
     } else {
-        buf[buf_len++] = static_cast<uint8_t>(w & 0xFF);        // X LSB
         buf[buf_len++] = static_cast<uint8_t>((w >> 8) & 0xFF); // X MSB
+        buf[buf_len++] = static_cast<uint8_t>(w & 0xFF);        // X LSB
     }
     buf[buf_len++] = static_cast<uint8_t>(h); // Y
                                               // coordinate
