@@ -542,6 +542,7 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
         }
     };
 
+    // NOTE: Remember origin (0,0) is in upper left hand corner of display
     // Summary: expect the following visible elements in order:
     // - neutral grey background
     // - red top band drawn through drawRowRGB888
@@ -589,16 +590,16 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     fillRect(0, middle_y, width, horizontal_band_height, 0x00, 0x00, 0xFF);
     delay_if_needed();
 
-    // Left accent column: magenta/pink.
+    // Left accent column: yellow.
     fillRect(0, 0, vertical_bar_width, height, 0xFF, 0xFF, 0x33);
     delay_if_needed();
 
-    // Right accent column: yellow.
+    // Right accent column: magenta/pink.
     fillRect(std::max(width - vertical_bar_width, 0), 0, vertical_bar_width, height,
              0xFF, 0x00, 0xFF);
     delay_if_needed();
 
-    // Diagonals: white from top-left and orange from top-right.
+    // Diagonals: orange from top-left and white from top-right.
     const int diag_length = std::min(width, height);
     const int diag_step = std::max(1, diag_length / 16);
     for (int i = 0; i < diag_length; i += diag_step) {
