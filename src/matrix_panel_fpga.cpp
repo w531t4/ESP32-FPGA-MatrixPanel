@@ -180,13 +180,18 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
         return;
     }
 
-    // uint8_t buf =
-    // 'Y';
-    uint8_t *buf = (uint8_t *)heap_caps_malloc(1, MALLOC_CAP_DMA);
-    buf[0] = 'Y';
+    const size_t chunk_bytes =
+        std::min(static_cast<size_t>(SPI_MAX_DMA_LEN), length);
+    uint8_t *buf =
+        static_cast<uint8_t *>(heap_caps_malloc(chunk_bytes, MALLOC_CAP_DMA));
+    if (buf == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888",
+                 "DMA alloc failed for frame chunk (%u bytes)",
+                 static_cast<unsigned>(chunk_bytes));
+        return;
+    }
 
-    // Send each 8-bit
-    // chunk
+    buf[0] = 'Y';
     spi_transaction_t t = {
         .length = (size_t)(8), // bits
         .tx_buffer = buf,
@@ -195,17 +200,28 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
     if (err != ESP_OK) {
         ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888",
                  "SPI transmit failed: %s", esp_err_to_name(err));
+        heap_caps_free(buf);
+        return;
     }
+
+    size_t offset = 0;
+    while (offset < length) {
+        const size_t chunk = std::min(length - offset, chunk_bytes);
+        memcpy(buf, data + offset, chunk);
+        spi_transaction_t t2 = {
+            .length = static_cast<size_t>(chunk * 8), // bits
+            .tx_buffer = buf,
+        };
+        esp_err_t err2 = spi_device_transmit(spi_bus, &t2);
+        if (err2 != ESP_OK) {
+            ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888",
+                     "SPI transmit failed: %s", esp_err_to_name(err2));
+            break;
+        }
+        offset += chunk;
+    }
+
     heap_caps_free(buf);
-    spi_transaction_t t2 = {
-        .length = (size_t)(length * 8), // bits
-        .tx_buffer = data,
-    };
-    esp_err_t err2 = spi_device_transmit(spi_bus, &t2);
-    if (err2 != ESP_OK) {
-        ESP_LOGE("MatrixPanel_FPGA_SPI:drawFrameRGB888",
-                 "SPI transmit failed: %s", esp_err_to_name(err2));
-    }
 };
 
 void MatrixPanel_FPGA_SPI::drawFrameRGB888(const uint8_t *data, size_t length) {
