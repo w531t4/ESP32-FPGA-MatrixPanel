@@ -20,6 +20,8 @@ void MatrixPanel_FPGA_SPI::do_swapFrame_() {
                  "Tried to set output brightness before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[1];
     uint16_t buf_len = 0;
 
@@ -37,6 +39,7 @@ void MatrixPanel_FPGA_SPI::do_swapFrame_() {
         ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888",
                  "SPI transmit failed: %s", esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::swapFrame() {
@@ -57,6 +60,8 @@ void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
                  "Tried to fulfill watchdog before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[9] = {'W',  0xDE, 0xAD, 0xBE, 0xEF,
                       0xFE, 0xEB, 0xDA, 0xED}; // 'W' is
                                                // the
@@ -74,6 +79,7 @@ void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
         ESP_LOGE("MatrixPanel_FPGA_SPI:fulfillWatchdog",
                  "SPI transmit failed: %s", esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
@@ -119,6 +125,33 @@ void MatrixPanel_FPGA_SPI::init_fpga_ready_gpio_() {
     if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_ready) == 0) {
         fpga_reset_seen_ = true;
     }
+}
+
+void MatrixPanel_FPGA_SPI::init_fpga_busy_gpio_() {
+    if (m_cfg.gpio.fpga_cmddone < 0)
+        return;
+    fpga_busy_configured_ = true;
+    gpio_reset_pin((gpio_num_t)m_cfg.gpio.fpga_cmddone);
+    gpio_set_direction((gpio_num_t)m_cfg.gpio.fpga_cmddone, GPIO_MODE_INPUT);
+    gpio_set_pull_mode((gpio_num_t)m_cfg.gpio.fpga_cmddone, GPIO_FLOATING);
+}
+
+bool MatrixPanel_FPGA_SPI::wait_for_fpga_ready_() {
+    if (!fpga_ready_configured_)
+        return true;
+    while (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_ready) == 0) {
+        vTaskDelay(1);
+    }
+    return true;
+}
+
+bool MatrixPanel_FPGA_SPI::wait_for_fpga_busy_clear_() {
+    if (!fpga_busy_configured_)
+        return true;
+    while (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_cmddone) != 0) {
+        vTaskDelay(1);
+    }
+    return true;
 }
 
 bool MatrixPanel_FPGA_SPI::consume_fpga_reset() {
@@ -179,6 +212,8 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
                  length);
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
 
     const size_t chunk_bytes =
         std::min(static_cast<size_t>(SPI_MAX_DMA_LEN), length);
@@ -222,6 +257,7 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
     }
 
     heap_caps_free(buf);
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::drawFrameRGB888(const uint8_t *data, size_t length) {
@@ -256,6 +292,8 @@ void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
                  y, length, expected_row_bytes);
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
 
     uint8_t buf[expected_row_bytes];
     uint16_t buf_len = 0;
@@ -278,6 +316,7 @@ void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
         ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888",
                  "SPI transmit failed: %s", esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, const uint8_t *data,
@@ -303,6 +342,8 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
                  "Tried to set output brightness before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[7];
     uint8_t buf_len = 0;
 
@@ -333,6 +374,7 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r,
@@ -360,6 +402,8 @@ void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g,
                  "Tried to set output brightness before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[4];
     uint8_t buf_len = 0;
 
@@ -379,6 +423,7 @@ void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g,
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
@@ -402,6 +447,8 @@ void MatrixPanel_FPGA_SPI::do_copyFrame_() {
                  "Tried to execute command before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[1];
     uint8_t buf_len = 0;
 
@@ -419,6 +466,7 @@ void MatrixPanel_FPGA_SPI::do_copyFrame_() {
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::copyFrame() {
@@ -439,6 +487,8 @@ void MatrixPanel_FPGA_SPI::do_clearScreen_() {
                  "Tried to set output brightness before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[1];
     uint8_t buf_len = 0;
 
@@ -456,6 +506,7 @@ void MatrixPanel_FPGA_SPI::do_clearScreen_() {
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::clearScreen() {
@@ -476,6 +527,8 @@ void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
                  "Tried to set output brightness before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[2];
     uint8_t buf_len = 0;
 
@@ -495,6 +548,7 @@ void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
@@ -518,6 +572,8 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
                  "Tried to set output brightness before begin()");
         return;
     }
+    if (!wait_for_fpga_ready_())
+        return;
     uint8_t buf[10];
     uint8_t buf_len = 0;
     // x1, y1, width,
@@ -558,6 +614,7 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,
