@@ -495,6 +495,49 @@ void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
     do_fillScreenRGB888_(r, g, b);
 }
 
+void MatrixPanel_FPGA_SPI::do_copyFrame_() {
+    if (!initialized) {
+        ESP_LOGI("copyFrame()",
+                 "Tried to execute command before begin()");
+        return;
+    }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
+    if (!wait_for_fpga_resetstatus_())
+        return;
+    uint8_t buf[1];
+    uint8_t buf_len = 0;
+
+    buf[buf_len++] = 'C'; // Command
+                          // byte
+
+    // Send each 8-bit
+    // chunk
+    spi_transaction_t t = {
+        .length = (size_t)(8 * buf_len), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
+                 esp_err_to_name(err));
+    }
+    wait_for_fpga_busy_clear_();
+};
+
+void MatrixPanel_FPGA_SPI::copyFrame() {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_)
+            return;
+        Job j;
+        j.op = Op::COPY_FRAME;
+        (void)xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_copyFrame_();
+}
+
 void MatrixPanel_FPGA_SPI::do_clearScreen_() {
     if (!initialized) {
         ESP_LOGI("clearScreen()",

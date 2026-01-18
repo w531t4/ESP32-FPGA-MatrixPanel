@@ -63,6 +63,7 @@ class MatrixPanel_FPGA_SPI {
     bool begin(const FPGA_SPI_CFG &cfg);
     void clearScreen();
 
+    void copyFrame();
     // rgb888 overload
     void fillRect(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r,
                   uint8_t g, uint8_t b);
@@ -130,6 +131,7 @@ class MatrixPanel_FPGA_SPI {
     };
 
     void do_clearScreen_();
+    void do_copyFrame_();
     void do_fillRect_(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r,
                       uint8_t g, uint8_t b);
     void do_fillScreenRGB888_(uint8_t r, uint8_t g, uint8_t b);
@@ -177,6 +179,7 @@ class MatrixPanel_FPGA_SPI {
         SET_BRIGHTNESS,
         CLEAR,
         DRAW_FRAME,
+        COPY_FRAME,
         DRAW_PIXEL,
         FILL_RECT
     };
@@ -220,6 +223,8 @@ class MatrixPanel_FPGA_SPI {
                 do_setBrightness8_(j.u8);
             else if (j.op == Op::CLEAR)
                 do_clearScreen_();
+            else if (j.op == Op::COPY_FRAME)
+                do_copyFrame_();
             else if (j.op == Op::DRAW_FRAME)
                 do_drawFrameRGB888_(j.data, j.length);
             else if (j.op == Op::DRAW_PIXEL)
