@@ -44,12 +44,6 @@ class MatrixPanel_FPGA_SPI {
         init_fpga_ready_gpio_();
 
         start_worker();
-        // Reset the fpga state
-        gpio_set_direction((gpio_num_t)m_cfg.gpio.fpga_reset, GPIO_MODE_OUTPUT);
-        gpio_set_level((gpio_num_t)m_cfg.gpio.fpga_reset, 0); // LOW
-        gpio_set_level((gpio_num_t)m_cfg.gpio.fpga_reset, 1); // HIGH
-        gpio_set_level((gpio_num_t)m_cfg.gpio.fpga_reset, 0); // LOW
-
         while (!initialized)
             ;
         if (!initialized) {

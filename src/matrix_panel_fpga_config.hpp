@@ -17,7 +17,6 @@
 #define SPI_MOSI_PIN_DEFAULT 2
 #define SPI_CE_PIN_DEFAULT 15
 
-#define FPGA_RESET_PIN_DEFAULT 4
 #define FPGA_READY_PIN_DEFAULT -1
 
 // Adapted from
@@ -86,7 +85,7 @@ struct FPGA_SPI_CFG {
 
     // GPIO Mapping
     struct spi_pins {
-        int8_t ce, clk, mosi, fpga_reset, fpga_ready;
+        int8_t ce, clk, mosi, fpga_ready;
     } gpio;
 
     // SPI clock speed
@@ -102,8 +101,7 @@ struct FPGA_SPI_CFG {
         uint16_t _w = MATRIX_WIDTH, uint16_t _h = MATRIX_HEIGHT,
         uint16_t _chain = CHAIN_LENGTH,
         spi_pins _pinmap = {SPI_CE_PIN_DEFAULT, SPI_CLK_PIN_DEFAULT,
-                            SPI_MOSI_PIN_DEFAULT, FPGA_RESET_PIN_DEFAULT,
-                            FPGA_READY_PIN_DEFAULT},
+                            SPI_MOSI_PIN_DEFAULT, FPGA_READY_PIN_DEFAULT},
         clk_speed _spispeed = HZ_8M, uint16_t _min_refresh_rate = 60,
         uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT)
         : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap),
