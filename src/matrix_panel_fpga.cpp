@@ -310,6 +310,119 @@ void MatrixPanel_FPGA_SPI::drawFrameRGB888(const uint8_t *data, size_t length) {
     do_drawFrameRGB888_(data, length);
 }
 
+void MatrixPanel_FPGA_SPI::do_drawRectRGB888_(int16_t x, int16_t y, int16_t w,
+                                              int16_t h, const uint8_t *data,
+                                              size_t length) {
+    if (!initialized) {
+        ESP_LOGI("drawRectRGB888()",
+                 "Tried to set output brightness before begin()");
+        return;
+    }
+    if (data == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888",
+                 "Invalid data passed to drawRectRGB888 nullptr! (length=%d)",
+                 length);
+        return;
+    }
+    if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888",
+                 "Invalid rect params x=%d y=%d w=%d h=%d", x, y, w, h);
+        return;
+    }
+    const size_t expected_len = static_cast<size_t>(w) *
+                                static_cast<size_t>(h) * 3;
+    if (length != expected_len) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888",
+                 "Invalid data length=%d expected=%d", length, expected_len);
+        return;
+    }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
+    if (!wait_for_fpga_resetstatus_())
+        return;
+
+    uint8_t header[7];
+    uint8_t header_len = 0;
+    header[header_len++] = 'X'; // Command byte
+    if (PIXELS_PER_ROW <= 0xff) {
+        header[header_len++] = static_cast<uint8_t>(x);
+    } else {
+        header[header_len++] = static_cast<uint8_t>((x >> 8) & 0xFF);
+        header[header_len++] = static_cast<uint8_t>(x & 0xFF);
+    }
+    header[header_len++] = static_cast<uint8_t>(y);
+    if (PIXELS_PER_ROW <= 0xff) {
+        header[header_len++] = static_cast<uint8_t>(w);
+    } else {
+        header[header_len++] = static_cast<uint8_t>((w >> 8) & 0xFF);
+        header[header_len++] = static_cast<uint8_t>(w & 0xFF);
+    }
+    header[header_len++] = static_cast<uint8_t>(h);
+
+    spi_transaction_t t = {
+        .length = (size_t)(8 * header_len), // bits
+        .tx_buffer = header,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888",
+                 "SPI transmit failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    const size_t chunk_bytes =
+        std::min(static_cast<size_t>(SPI_MAX_DMA_LEN), length);
+    uint8_t *buf =
+        static_cast<uint8_t *>(heap_caps_malloc(chunk_bytes, MALLOC_CAP_DMA));
+    if (buf == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888",
+                 "DMA alloc failed for rect chunk (%u bytes)",
+                 static_cast<unsigned>(chunk_bytes));
+        return;
+    }
+
+    size_t offset = 0;
+    while (offset < length) {
+        const size_t chunk = std::min(length - offset, chunk_bytes);
+        memcpy(buf, data + offset, chunk);
+        spi_transaction_t t2 = {
+            .length = static_cast<size_t>(chunk * 8), // bits
+            .tx_buffer = buf,
+        };
+        esp_err_t err2 = spi_device_transmit(spi_bus, &t2);
+        if (err2 != ESP_OK) {
+            ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888",
+                     "SPI transmit failed: %s", esp_err_to_name(err2));
+            break;
+        }
+        offset += chunk;
+    }
+
+    heap_caps_free(buf);
+    wait_for_fpga_busy_clear_();
+}
+
+void MatrixPanel_FPGA_SPI::drawRectRGB888(int16_t x, int16_t y, int16_t w,
+                                          int16_t h, const uint8_t *data,
+                                          size_t length) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_)
+            return;
+        Job j;
+        j.op = Op::DRAW_RECT;
+        j.x = x;
+        j.y = static_cast<uint8_t>(y);
+        j.w = w;
+        j.h = h;
+        j.data = data;
+        j.length = length;
+        (void)xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_drawRectRGB888_(x, y, w, h, data, length);
+}
+
 void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
                                              const uint8_t *data,
                                              size_t length) {
@@ -730,6 +843,11 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     // - blue center band via fillRect
     // - yellow left column, magenta right column for edge accents
     // - opposing diagonals (orange/white) to cover drawPixelRGB888
+    // - centered drawRectRGB888 rect: size=max(4, width/5)xmax(4, height/3)
+    //      BLACK        GRADIANT         RED
+    //      .............GRADIANT..............
+    //      .............GRADIANT..............
+    //      TEAL/GREEN   GRADIANT        YELLOW
     // - brightness pushed to 255 and the frame swapped to display the pattern
     clearScreen();
     delay_if_needed();
@@ -778,6 +896,34 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     // Right accent column: magenta/pink.
     fillRect(std::max(width - vertical_bar_width, 0), 0, vertical_bar_width, height,
              0xFF, 0x00, 0xFF);
+    wait_for_worker_idle();
+    delay_if_needed();
+
+    // Buffered rectangle: gradient checker to exercise drawRectRGB888.
+    const int rect_w = std::max(4, width / 5);
+    const int rect_h = std::max(4, height / 3);
+    const int rect_x = std::max(0, (width - rect_w) / 2);
+    const int rect_y = std::max(0, (height - rect_h) / 2);
+    const int rect_w_denom = std::max(1, rect_w - 1);
+    const int rect_h_denom = std::max(1, rect_h - 1);
+    std::vector<uint8_t> rect_buf(
+        static_cast<size_t>(rect_w) * static_cast<size_t>(rect_h) * 3);
+    for (int y = 0; y < rect_h; ++y) {
+        for (int x = 0; x < rect_w; ++x) {
+            const size_t idx =
+                (static_cast<size_t>(y) * rect_w + x) * 3;
+            const uint8_t r = static_cast<uint8_t>(
+                (x * 255) / rect_w_denom);
+            const uint8_t g = static_cast<uint8_t>(
+                (y * 255) / rect_h_denom);
+            const uint8_t b = ((x + y) & 1) ? 0x20 : 0xA0;
+            rect_buf[idx] = r;
+            rect_buf[idx + 1] = g;
+            rect_buf[idx + 2] = b;
+        }
+    }
+    drawRectRGB888(rect_x, rect_y, rect_w, rect_h, rect_buf.data(),
+                   rect_buf.size());
     wait_for_worker_idle();
     delay_if_needed();
 
