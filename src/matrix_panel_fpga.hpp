@@ -5,6 +5,7 @@
 #define _ESP32_RGB_64_32_MATRIX_PANEL_SPI_DMA
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "matrix_panel_fpga_config.hpp"
 #include <stdint.h>
@@ -68,6 +69,9 @@ class MatrixPanel_FPGA_SPI {
     void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
     void drawRowRGB888(const uint8_t y, const uint8_t *data, size_t length);
     void drawFrameRGB888(const uint8_t *data, size_t length);
+    bool queue_has_space(size_t slots = 1) const;
+    bool worker_is_idle() const;
+    bool is_worker_enabled() const { return use_worker_; }
     void run_test_graphic(uint32_t delay_ms = 10);
     void swapFrame();
     void fulfillWatchdog();
@@ -158,6 +162,7 @@ class MatrixPanel_FPGA_SPI {
     bool fpga_resetstatus_configured_ = false;
     volatile bool fpga_reset_seen_ = false;
     uint32_t reset_epoch_ = 0;
+    volatile bool worker_busy_ = false;
     SemaphoreHandle_t spi_mutex_ = nullptr;
 
     enum class Op : uint8_t {
@@ -198,6 +203,7 @@ class MatrixPanel_FPGA_SPI {
         for (;;) {
             if (xQueueReceive(tx_q_, &j, portMAX_DELAY) != pdTRUE)
                 continue;
+            this->worker_busy_ = true;
             if (j.op == Op::DRAW_ROW)
                 do_drawRowRGB888_(j.y, j.data, j.length);
             else if (j.op == Op::SWAP)
@@ -216,6 +222,7 @@ class MatrixPanel_FPGA_SPI {
                 do_drawPixelRGB888_(j.x, j.y, j.r, j.g, j.b);
             else if (j.op == Op::FILL_RECT)
                 do_fillRect_(j.x, j.y, j.w, j.h, j.r, j.g, j.b);
+            this->worker_busy_ = false;
         }
     }
     static constexpr UBaseType_t TX_TASK_PRIO = 2; // was 3
