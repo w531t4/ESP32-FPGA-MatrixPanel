@@ -4,6 +4,7 @@
 #include "driver/gpio.h"
 #include "esp_attr.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include <algorithm>
 #include <vector>
@@ -344,6 +345,18 @@ void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, const uint8_t *data,
     do_drawRowRGB888_(y, data, length);
 }
 
+bool MatrixPanel_FPGA_SPI::queue_has_space(size_t slots) const {
+    if (!use_worker_ || !tx_q_)
+        return true;
+    return uxQueueSpacesAvailable(tx_q_) >= slots;
+}
+
+bool MatrixPanel_FPGA_SPI::worker_is_idle() const {
+    if (!use_worker_ || !tx_q_)
+        return true;
+    return uxQueueMessagesWaiting(tx_q_) == 0 && !worker_busy_;
+}
+
 void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
                                                uint8_t g, uint8_t b) {
     if (!initialized) {
@@ -625,6 +638,13 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
             vTaskDelay(delay_ticks);
         }
     };
+    const auto wait_for_worker_idle = [&]() {
+        if (!use_worker_)
+            return;
+        while (!worker_is_idle()) {
+            vTaskDelay(1);
+        }
+    };
 
     // NOTE: Remember origin (0,0) is in upper left hand corner of display
     // Summary: expect the following visible elements in order:
@@ -676,11 +696,13 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
 
     // Left accent column: yellow.
     fillRect(0, 0, vertical_bar_width, height, 0xFF, 0xFF, 0x33);
+    wait_for_worker_idle();
     delay_if_needed();
 
     // Right accent column: magenta/pink.
     fillRect(std::max(width - vertical_bar_width, 0), 0, vertical_bar_width, height,
              0xFF, 0x00, 0xFF);
+    wait_for_worker_idle();
     delay_if_needed();
 
     // Diagonals: orange from top-left and white from top-right.
