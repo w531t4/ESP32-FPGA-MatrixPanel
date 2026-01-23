@@ -402,6 +402,90 @@ void MatrixPanel_FPGA_SPI::do_drawRectRGB888_(int16_t x, int16_t y, int16_t w,
     heap_caps_free(buf);
     wait_for_fpga_busy_clear_();
 }
+void MatrixPanel_FPGA_SPI::do_drawRectRGB888_prealloc_(
+    int16_t x, int16_t y, int16_t w, int16_t h, const uint8_t *data,
+    size_t length) {
+    if (!initialized) {
+        ESP_LOGI("drawRectRGB888_prealloc()",
+                 "Tried to set output brightness before begin()");
+        return;
+    }
+    if (data == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888_prealloc",
+                 "Invalid data passed to drawRectRGB888_prealloc nullptr! "
+                 "(length=%d)",
+                 length);
+        return;
+    }
+    if (x < 0 || y < 0 || w <= 0 || h <= 0) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888_prealloc",
+                 "Invalid rect params x=%d y=%d w=%d h=%d", x, y, w, h);
+        return;
+    }
+    const size_t expected_len = static_cast<size_t>(w) *
+                                static_cast<size_t>(h) * 3;
+    if (length != expected_len) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888_prealloc",
+                 "Invalid data length=%d expected=%d", length, expected_len);
+        return;
+    }
+    if (w == 1 && y == 0 && h == height()) {
+        do_drawColumnRGB888_(x, data, length);
+        return;
+    }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
+    if (!wait_for_fpga_resetstatus_())
+        return;
+
+    uint8_t header[7];
+    uint8_t header_len = 0;
+    header[header_len++] = 'X'; // Command byte
+    if (PIXELS_PER_ROW <= 0xff) {
+        header[header_len++] = static_cast<uint8_t>(x);
+    } else {
+        header[header_len++] = static_cast<uint8_t>((x >> 8) & 0xFF);
+        header[header_len++] = static_cast<uint8_t>(x & 0xFF);
+    }
+    header[header_len++] = static_cast<uint8_t>(y);
+    if (PIXELS_PER_ROW <= 0xff) {
+        header[header_len++] = static_cast<uint8_t>(w);
+    } else {
+        header[header_len++] = static_cast<uint8_t>((w >> 8) & 0xFF);
+        header[header_len++] = static_cast<uint8_t>(w & 0xFF);
+    }
+    header[header_len++] = static_cast<uint8_t>(h);
+
+    spi_transaction_t t = {
+        .length = (size_t)(8 * header_len), // bits
+        .tx_buffer = header,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888_prealloc",
+                 "SPI transmit failed: %s", esp_err_to_name(err));
+        return;
+    }
+
+    size_t offset = 0;
+    while (offset < length) {
+        const size_t chunk =
+            std::min(length - offset, static_cast<size_t>(SPI_MAX_DMA_LEN));
+        spi_transaction_t t2 = {
+            .length = static_cast<size_t>(chunk * 8), // bits
+            .tx_buffer = data + offset,
+        };
+        esp_err_t err2 = spi_device_transmit(spi_bus, &t2);
+        if (err2 != ESP_OK) {
+            ESP_LOGE("MatrixPanel_FPGA_SPI:drawRectRGB888_prealloc",
+                     "SPI transmit failed: %s", esp_err_to_name(err2));
+            break;
+        }
+        offset += chunk;
+    }
+    wait_for_fpga_busy_clear_();
+}
 
 void MatrixPanel_FPGA_SPI::drawRectRGB888(int16_t x, int16_t y, int16_t w,
                                           int16_t h, const uint8_t *data,
@@ -421,6 +505,27 @@ void MatrixPanel_FPGA_SPI::drawRectRGB888(int16_t x, int16_t y, int16_t w,
         return;
     }
     do_drawRectRGB888_(x, y, w, h, data, length);
+}
+
+void MatrixPanel_FPGA_SPI::drawRectRGB888_prealloc(int16_t x, int16_t y,
+                                                   int16_t w, int16_t h,
+                                                   const uint8_t *data,
+                                                   size_t length) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_)
+            return;
+        Job j;
+        j.op = Op::DRAW_RECT_PREALLOC;
+        j.x = x;
+        j.y = static_cast<uint8_t>(y);
+        j.w = w;
+        j.h = h;
+        j.data = data;
+        j.length = length;
+        (void)xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_drawRectRGB888_prealloc_(x, y, w, h, data, length);
 }
 
 void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
