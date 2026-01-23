@@ -70,6 +70,7 @@ class MatrixPanel_FPGA_SPI {
     void fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b);
     void drawPixelRGB888(int16_t x, int16_t y, uint8_t r, uint8_t g, uint8_t b);
     void drawRowRGB888(const uint8_t y, const uint8_t *data, size_t length);
+    void drawColumnRGB888(int16_t x, const uint8_t *data, size_t length);
     void drawFrameRGB888(const uint8_t *data, size_t length);
     bool queue_has_space(size_t slots = 1) const;
     bool worker_is_idle() const;
@@ -140,6 +141,7 @@ class MatrixPanel_FPGA_SPI {
     void do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r, uint8_t g,
                              uint8_t b);
     void do_drawRowRGB888_(const uint8_t y, const uint8_t *data, size_t length);
+    void do_drawColumnRGB888_(int16_t x, const uint8_t *data, size_t length);
     void do_drawFrameRGB888_(const uint8_t *data, size_t length);
     void do_drawRectRGB888_(int16_t x, int16_t y, int16_t w, int16_t h,
                             const uint8_t *data, size_t length);
@@ -177,6 +179,7 @@ class MatrixPanel_FPGA_SPI {
 
     enum class Op : uint8_t {
         DRAW_ROW,
+        DRAW_COL,
         SWAP,
         WATCHDOG,
         FILL_SCREEN,
@@ -190,8 +193,8 @@ class MatrixPanel_FPGA_SPI {
     };
     struct Job {
         Op op;
-        const uint8_t *data = nullptr; // for DRAW_ROW / DRAW_FRAME / DRAW_RECT
-        size_t length = 0;             // for DRAW_ROW / DRAW_FRAME / DRAW_RECT
+        const uint8_t *data = nullptr; // for DRAW_ROW / DRAW_COL / DRAW_FRAME / DRAW_RECT
+        size_t length = 0;             // for DRAW_ROW / DRAW_COL / DRAW_FRAME / DRAW_RECT
 
         uint8_t y = 0; // row index
         int16_t x = 0; // for DRAW_PIXEL / DRAW_RECT / FILL_RECT
@@ -218,6 +221,8 @@ class MatrixPanel_FPGA_SPI {
             this->worker_busy_ = true;
             if (j.op == Op::DRAW_ROW)
                 do_drawRowRGB888_(j.y, j.data, j.length);
+            else if (j.op == Op::DRAW_COL)
+                do_drawColumnRGB888_(j.x, j.data, j.length);
             else if (j.op == Op::SWAP)
                 do_swapFrame_();
             else if (j.op == Op::WATCHDOG)
