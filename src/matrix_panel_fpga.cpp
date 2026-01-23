@@ -9,7 +9,7 @@
 #include <vector>
 #include <cstring>
 
-void IRAM_ATTR MatrixPanel_FPGA_SPI::fpga_ready_isr_(void *arg) {
+void IRAM_ATTR MatrixPanel_FPGA_SPI::fpga_resetstatus_isr_(void *arg) {
     auto *self = static_cast<MatrixPanel_FPGA_SPI *>(arg);
     self->fpga_reset_seen_ = true;
 }
@@ -110,12 +110,12 @@ void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
     do_fulfillWatchdog_();
 }
 
-void MatrixPanel_FPGA_SPI::init_fpga_ready_gpio_() {
-    if (m_cfg.gpio.fpga_ready < 0)
+void MatrixPanel_FPGA_SPI::init_fpga_resetstatus_gpio_() {
+    if (m_cfg.gpio.fpga_resetstatus < 0)
         return;
-    fpga_ready_configured_ = true;
-    gpio_reset_pin((gpio_num_t)m_cfg.gpio.fpga_ready);
-    gpio_set_direction((gpio_num_t)m_cfg.gpio.fpga_ready, GPIO_MODE_INPUT);
+    fpga_resetstatus_configured_ = true;
+    gpio_reset_pin((gpio_num_t)m_cfg.gpio.fpga_resetstatus);
+    gpio_set_direction((gpio_num_t)m_cfg.gpio.fpga_resetstatus, GPIO_MODE_INPUT);
 
     static bool isr_service_installed = false;
     if (!isr_service_installed) {
@@ -123,32 +123,32 @@ void MatrixPanel_FPGA_SPI::init_fpga_ready_gpio_() {
         if (err == ESP_OK || err == ESP_ERR_INVALID_STATE) {
             isr_service_installed = true;
         } else {
-            ESP_LOGE("fpga_ready", "ISR service install failed: %s",
+            ESP_LOGE("fpga_resetstatus", "ISR service install failed: %s",
                      esp_err_to_name(err));
         }
     }
     if (isr_service_installed) {
-        gpio_set_intr_type((gpio_num_t)m_cfg.gpio.fpga_ready,
+        gpio_set_intr_type((gpio_num_t)m_cfg.gpio.fpga_resetstatus,
                            GPIO_INTR_NEGEDGE);
         esp_err_t err = gpio_isr_handler_add(
-            (gpio_num_t)m_cfg.gpio.fpga_ready,
-            &MatrixPanel_FPGA_SPI::fpga_ready_isr_, this);
+            (gpio_num_t)m_cfg.gpio.fpga_resetstatus,
+            &MatrixPanel_FPGA_SPI::fpga_resetstatus_isr_, this);
         if (err != ESP_OK) {
-            ESP_LOGE("fpga_ready", "ISR attach failed: %s",
+            ESP_LOGE("fpga_resetstatus", "ISR attach failed: %s",
                      esp_err_to_name(err));
         }
     }
-    if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_ready) == 0) {
+    if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) == 0) {
         fpga_reset_seen_ = true;
     }
 }
 
 bool MatrixPanel_FPGA_SPI::consume_fpga_reset() {
-    if (!fpga_ready_configured_)
+    if (!fpga_resetstatus_configured_)
         return false;
     if (!fpga_reset_seen_)
         return false;
-    if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_ready) == 0)
+    if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) == 0)
         return false;
     fpga_reset_seen_ = false;
     reset_epoch_++;
