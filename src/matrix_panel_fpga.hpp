@@ -77,6 +77,8 @@ class MatrixPanel_FPGA_SPI {
     bool is_worker_enabled() const { return use_worker_; }
     void drawRectRGB888(int16_t x, int16_t y, int16_t w, int16_t h,
                         const uint8_t *data, size_t length);
+    void drawRectRGB888_prealloc(int16_t x, int16_t y, int16_t w, int16_t h,
+                                 const uint8_t *data, size_t length);
     void run_test_graphic(uint32_t delay_ms = 10);
     void swapFrame();
     void fulfillWatchdog();
@@ -145,6 +147,8 @@ class MatrixPanel_FPGA_SPI {
     void do_drawFrameRGB888_(const uint8_t *data, size_t length);
     void do_drawRectRGB888_(int16_t x, int16_t y, int16_t w, int16_t h,
                             const uint8_t *data, size_t length);
+    void do_drawRectRGB888_prealloc_(int16_t x, int16_t y, int16_t w, int16_t h,
+                                     const uint8_t *data, size_t length);
     void do_swapFrame_();
     void do_fulfillWatchdog_();
     void do_setBrightness8_(const uint8_t b);
@@ -187,19 +191,20 @@ class MatrixPanel_FPGA_SPI {
         CLEAR,
         DRAW_FRAME,
         DRAW_RECT,
+        DRAW_RECT_PREALLOC,
         COPY_FRAME,
         DRAW_PIXEL,
         FILL_RECT
     };
     struct Job {
         Op op;
-        const uint8_t *data = nullptr; // for DRAW_ROW / DRAW_COL / DRAW_FRAME / DRAW_RECT
-        size_t length = 0;             // for DRAW_ROW / DRAW_COL / DRAW_FRAME / DRAW_RECT
+        const uint8_t *data = nullptr; // for DRAW_ROW / DRAW_COL / DRAW_FRAME / DRAW_RECT / DRAW_RECT_PREALLOC
+        size_t length = 0; // for DRAW_ROW / DRAW_COL / DRAW_FRAME / DRAW_RECT / DRAW_RECT_PREALLOC
 
         uint8_t y = 0; // row index
-        int16_t x = 0; // for DRAW_PIXEL / DRAW_RECT / FILL_RECT
-        int16_t w = 0; // for DRAW_RECT / FILL_RECT
-        int16_t h = 0; // for DRAW_RECT / FILL_RECT
+        int16_t x = 0; // for DRAW_PIXEL / DRAW_RECT / DRAW_RECT_PREALLOC / FILL_RECT
+        int16_t w = 0; // for DRAW_RECT / DRAW_RECT_PREALLOC / FILL_RECT
+        int16_t h = 0; // for DRAW_RECT / DRAW_RECT_PREALLOC / FILL_RECT
 
         uint8_t r = 0, g = 0,
                 b = 0;  // for colors (FILL_SCREEN / DRAW_PIXEL / FILL_RECT)
@@ -239,6 +244,9 @@ class MatrixPanel_FPGA_SPI {
                 do_drawFrameRGB888_(j.data, j.length);
             else if (j.op == Op::DRAW_RECT)
                 do_drawRectRGB888_(j.x, j.y, j.w, j.h, j.data, j.length);
+            else if (j.op == Op::DRAW_RECT_PREALLOC)
+                do_drawRectRGB888_prealloc_(j.x, j.y, j.w, j.h, j.data,
+                                            j.length);
             else if (j.op == Op::DRAW_PIXEL)
                 do_drawPixelRGB888_(j.x, j.y, j.r, j.g, j.b);
             else if (j.op == Op::FILL_RECT)
