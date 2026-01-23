@@ -58,6 +58,7 @@ void MatrixPanel_FPGA_SPI::do_swapFrame_() {
         ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888",
                  "SPI transmit failed: %s", esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::swapFrame() {
@@ -99,6 +100,7 @@ void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
         ESP_LOGE("MatrixPanel_FPGA_SPI:fulfillWatchdog",
                  "SPI transmit failed: %s", esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::fulfillWatchdog() {
@@ -146,6 +148,15 @@ void MatrixPanel_FPGA_SPI::init_fpga_resetstatus_gpio_() {
     }
 }
 
+void MatrixPanel_FPGA_SPI::init_fpga_busy_gpio_() {
+    if (m_cfg.gpio.fpga_busy < 0)
+        return;
+    fpga_busy_configured_ = true;
+    gpio_reset_pin((gpio_num_t)m_cfg.gpio.fpga_busy);
+    gpio_set_direction((gpio_num_t)m_cfg.gpio.fpga_busy, GPIO_MODE_INPUT);
+    gpio_set_pull_mode((gpio_num_t)m_cfg.gpio.fpga_busy, GPIO_FLOATING);
+}
+
 bool MatrixPanel_FPGA_SPI::wait_for_fpga_resetstatus_() {
     if (!fpga_resetstatus_configured_)
         return true;
@@ -155,6 +166,21 @@ bool MatrixPanel_FPGA_SPI::wait_for_fpga_resetstatus_() {
     while (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) == 0) {
         if ((xTaskGetTickCount() - start) > timeout) {
             ESP_LOGW("fpga_resetstatus", "Timeout waiting for FPGA resetstatus");
+            return false;
+        }
+        vTaskDelay(1);
+    }
+    return true;
+}
+
+bool MatrixPanel_FPGA_SPI::wait_for_fpga_busy_clear_() {
+    if (!fpga_busy_configured_)
+        return true;
+    const TickType_t start = xTaskGetTickCount();
+    const TickType_t timeout = pdMS_TO_TICKS(m_cfg.fpga_busy_timeout_ms);
+    while (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_busy) != 0) {
+        if ((xTaskGetTickCount() - start) > timeout) {
+            ESP_LOGW("fpga_busy", "Timeout waiting for FPGA busy clear");
             return false;
         }
         vTaskDelay(1);
@@ -267,6 +293,7 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
     }
 
     heap_caps_free(buf);
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::drawFrameRGB888(const uint8_t *data, size_t length) {
@@ -327,6 +354,7 @@ void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
         ESP_LOGE("MatrixPanel_FPGA_SPI:drawRowRGB888",
                  "SPI transmit failed: %s", esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::drawRowRGB888(const uint8_t y, const uint8_t *data,
@@ -398,6 +426,7 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::drawPixelRGB888(int16_t x, int16_t y, uint8_t r,
@@ -448,6 +477,7 @@ void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g,
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::fillScreenRGB888(uint8_t r, uint8_t g, uint8_t b) {
@@ -492,6 +522,7 @@ void MatrixPanel_FPGA_SPI::do_clearScreen_() {
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::clearScreen() {
@@ -535,6 +566,7 @@ void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::setBrightness8(const uint8_t b) {
@@ -602,6 +634,7 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
         ESP_LOGE("MatrixPanel", "SPI transmit failed: %s",
                  esp_err_to_name(err));
     }
+    wait_for_fpga_busy_clear_();
 };
 
 void MatrixPanel_FPGA_SPI::fillRect(int16_t x, int16_t y, int16_t w, int16_t h,

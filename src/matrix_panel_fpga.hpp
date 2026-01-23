@@ -44,6 +44,7 @@ class MatrixPanel_FPGA_SPI {
 
         init_spi(m_cfg);
         init_fpga_resetstatus_gpio_();
+        init_fpga_busy_gpio_();
 
         start_worker();
         while (!initialized)
@@ -140,7 +141,9 @@ class MatrixPanel_FPGA_SPI {
     void do_fulfillWatchdog_();
     void do_setBrightness8_(const uint8_t b);
     void init_fpga_resetstatus_gpio_();
+    void init_fpga_busy_gpio_();
     bool wait_for_fpga_resetstatus_();
+    bool wait_for_fpga_busy_clear_();
     static void fpga_resetstatus_isr_(void *arg);
     // Matrix i2s settings
     FPGA_SPI_CFG m_cfg;
@@ -160,6 +163,7 @@ class MatrixPanel_FPGA_SPI {
     bool initialized = false;
     bool config_set = false;
     bool fpga_resetstatus_configured_ = false;
+    bool fpga_busy_configured_ = false;
     volatile bool fpga_reset_seen_ = false;
     uint32_t reset_epoch_ = 0;
     volatile bool worker_busy_ = false;
