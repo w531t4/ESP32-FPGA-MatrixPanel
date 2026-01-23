@@ -76,7 +76,7 @@ class MatrixPanel_FPGA_SPI {
     uint32_t get_reset_epoch() const { return reset_epoch_; }
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
-    virtual void setBrightness8(const uint8_t b);
+    void setBrightness8(const uint8_t b);
     const FPGA_SPI_CFG &getCfg() const { return m_cfg; };
 
     inline bool setCfg(const FPGA_SPI_CFG &cfg) {
