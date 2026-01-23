@@ -27,7 +27,7 @@ jobs:
           python-version: 3.11
 
       - name: Install semantic-release
-        run: pip install python-semantic-release==9.8.0
+        run: pip install python-semantic-release==10.5.3
 
       - name: Publish release - version
         env:
