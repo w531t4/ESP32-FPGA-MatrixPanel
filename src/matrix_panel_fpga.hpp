@@ -136,6 +136,7 @@ class MatrixPanel_FPGA_SPI {
     void do_fulfillWatchdog_();
     void do_setBrightness8_(const uint8_t b);
     void init_fpga_resetstatus_gpio_();
+    bool wait_for_fpga_resetstatus_();
     static void fpga_resetstatus_isr_(void *arg);
     // Matrix i2s settings
     FPGA_SPI_CFG m_cfg;

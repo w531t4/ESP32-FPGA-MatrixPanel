@@ -96,6 +96,9 @@ struct FPGA_SPI_CFG {
     // to get all colour depths displayed with correct BCM time weighting.
     uint8_t min_refresh_rate;
 
+    // FPGA status timeouts (milliseconds)
+    uint16_t fpga_resetstatus_timeout_ms;
+
     // struct constructor
     FPGA_SPI_CFG(
         uint16_t _w = MATRIX_WIDTH, uint16_t _h = MATRIX_HEIGHT,
@@ -103,9 +106,11 @@ struct FPGA_SPI_CFG {
         spi_pins _pinmap = {SPI_CE_PIN_DEFAULT, SPI_CLK_PIN_DEFAULT,
                             SPI_MOSI_PIN_DEFAULT, FPGA_RESETSTATUS_PIN_DEFAULT},
         clk_speed _spispeed = HZ_8M, uint16_t _min_refresh_rate = 60,
-        uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT)
+        uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT,
+        uint16_t _fpga_resetstatus_timeout_ms = 1000)
         : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap),
-          spispeed(_spispeed), min_refresh_rate(_min_refresh_rate) {
+          spispeed(_spispeed), min_refresh_rate(_min_refresh_rate),
+          fpga_resetstatus_timeout_ms(_fpga_resetstatus_timeout_ms) {
         setPixelColorDepthBits(_pixel_color_depth_bits);
     }
 
