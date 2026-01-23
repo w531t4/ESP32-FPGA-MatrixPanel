@@ -564,8 +564,8 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     // - red top band drawn through drawRowRGB888
     // - green bottom band via fillRect
     // - blue center band via fillRect
-    // - magenta left column, yellow right column for edge accents
-    // - opposing diagonals (white/orange) to cover drawPixelRGB888
+    // - yellow left column, magenta right column for edge accents
+    // - opposing diagonals (orange/white) to cover drawPixelRGB888
     // - brightness pushed to 255 and the frame swapped to display the pattern
     clearScreen();
     delay_if_needed();
