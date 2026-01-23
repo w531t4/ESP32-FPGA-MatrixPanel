@@ -38,6 +38,7 @@ void MatrixPanel_FPGA_SPI::do_swapFrame_() {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[1];
     uint16_t buf_len = 0;
@@ -78,6 +79,7 @@ void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[9] = {'W',  0xDE, 0xAD, 0xBE, 0xEF,
                       0xFE, 0xEB, 0xDA, 0xED}; // 'W' is
@@ -143,6 +145,22 @@ void MatrixPanel_FPGA_SPI::init_fpga_resetstatus_gpio_() {
     }
 }
 
+bool MatrixPanel_FPGA_SPI::wait_for_fpga_resetstatus_() {
+    if (!fpga_resetstatus_configured_)
+        return true;
+    const TickType_t start = xTaskGetTickCount();
+    const TickType_t timeout =
+        pdMS_TO_TICKS(m_cfg.fpga_resetstatus_timeout_ms);
+    while (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) == 0) {
+        if ((xTaskGetTickCount() - start) > timeout) {
+            ESP_LOGW("fpga_resetstatus", "Timeout waiting for FPGA resetstatus");
+            return false;
+        }
+        vTaskDelay(1);
+    }
+    return true;
+}
+
 bool MatrixPanel_FPGA_SPI::consume_fpga_reset() {
     if (!fpga_resetstatus_configured_)
         return false;
@@ -203,6 +221,7 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
 
     const size_t chunk_bytes =
@@ -283,6 +302,7 @@ void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
 
     uint8_t buf[expected_row_bytes];
@@ -333,6 +353,7 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[7];
     uint8_t buf_len = 0;
@@ -393,6 +414,7 @@ void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[4];
     uint8_t buf_len = 0;
@@ -438,6 +460,7 @@ void MatrixPanel_FPGA_SPI::do_clearScreen_() {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[1];
     uint8_t buf_len = 0;
@@ -478,6 +501,7 @@ void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[2];
     uint8_t buf_len = 0;
@@ -523,6 +547,7 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+    if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[10];
     uint8_t buf_len = 0;
