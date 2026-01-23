@@ -42,7 +42,7 @@ class MatrixPanel_FPGA_SPI {
         }
 
         init_spi(m_cfg);
-        init_fpga_ready_gpio_();
+        init_fpga_resetstatus_gpio_();
 
         start_worker();
         while (!initialized)
@@ -135,8 +135,8 @@ class MatrixPanel_FPGA_SPI {
     void do_drawFrameRGB888_(const uint8_t *data, size_t length);
     void do_swapFrame_();
     void do_fulfillWatchdog_();
-    void init_fpga_ready_gpio_();
-    static void fpga_ready_isr_(void *arg);
+    void init_fpga_resetstatus_gpio_();
+    static void fpga_resetstatus_isr_(void *arg);
     // Matrix i2s settings
     FPGA_SPI_CFG m_cfg;
 
@@ -154,7 +154,7 @@ class MatrixPanel_FPGA_SPI {
     // Other private variables
     bool initialized = false;
     bool config_set = false;
-    bool fpga_ready_configured_ = false;
+    bool fpga_resetstatus_configured_ = false;
     volatile bool fpga_reset_seen_ = false;
     uint32_t reset_epoch_ = 0;
     SemaphoreHandle_t spi_mutex_ = nullptr;
