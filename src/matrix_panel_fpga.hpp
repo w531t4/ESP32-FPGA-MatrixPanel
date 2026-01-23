@@ -77,7 +77,6 @@ class MatrixPanel_FPGA_SPI {
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
     virtual void setBrightness8(const uint8_t b);
-    virtual void do_setBrightness8_(const uint8_t b);
     const FPGA_SPI_CFG &getCfg() const { return m_cfg; };
 
     inline bool setCfg(const FPGA_SPI_CFG &cfg) {
@@ -135,6 +134,7 @@ class MatrixPanel_FPGA_SPI {
     void do_drawFrameRGB888_(const uint8_t *data, size_t length);
     void do_swapFrame_();
     void do_fulfillWatchdog_();
+    void do_setBrightness8_(const uint8_t b);
     void init_fpga_resetstatus_gpio_();
     static void fpga_resetstatus_isr_(void *arg);
     // Matrix i2s settings
