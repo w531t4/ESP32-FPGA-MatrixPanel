@@ -5,6 +5,7 @@
 #define _ESP32_RGB_64_32_MATRIX_PANEL_SPI_DMA
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
+#include "freertos/semphr.h"
 #include "matrix_panel_fpga_config.hpp"
 #include <stdint.h>
 
@@ -107,6 +108,23 @@ class MatrixPanel_FPGA_SPI {
     spi_device_handle_t spi_bus;
 
   private:
+    bool lock_spi_();
+    void unlock_spi_();
+    class SpiLockGuard {
+      public:
+        explicit SpiLockGuard(MatrixPanel_FPGA_SPI *self)
+            : self_(self), locked_(self_->lock_spi_()) {}
+        ~SpiLockGuard() {
+            if (locked_)
+                self_->unlock_spi_();
+        }
+        bool locked() const { return locked_; }
+
+      private:
+        MatrixPanel_FPGA_SPI *self_;
+        bool locked_;
+    };
+
     void do_clearScreen_();
     void do_fillRect_(int16_t x, int16_t y, int16_t w, int16_t h, uint8_t r,
                       uint8_t g, uint8_t b);
@@ -139,6 +157,7 @@ class MatrixPanel_FPGA_SPI {
     bool fpga_ready_configured_ = false;
     volatile bool fpga_reset_seen_ = false;
     uint32_t reset_epoch_ = 0;
+    SemaphoreHandle_t spi_mutex_ = nullptr;
 
     enum class Op : uint8_t {
         DRAW_ROW,

@@ -14,12 +14,31 @@ void IRAM_ATTR MatrixPanel_FPGA_SPI::fpga_ready_isr_(void *arg) {
     self->fpga_reset_seen_ = true;
 }
 
+bool MatrixPanel_FPGA_SPI::lock_spi_() {
+    if (spi_mutex_ == nullptr)
+        return true;
+    if (xSemaphoreTake(spi_mutex_, portMAX_DELAY) != pdTRUE) {
+        ESP_LOGE("MatrixPanel", "SPI lock failed");
+        return false;
+    }
+    return true;
+}
+
+void MatrixPanel_FPGA_SPI::unlock_spi_() {
+    if (spi_mutex_ == nullptr)
+        return;
+    xSemaphoreGive(spi_mutex_);
+}
+
 void MatrixPanel_FPGA_SPI::do_swapFrame_() {
     if (!initialized) {
         ESP_LOGI("drawRowRGB888()",
                  "Tried to set output brightness before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[1];
     uint16_t buf_len = 0;
 
@@ -57,6 +76,9 @@ void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
                  "Tried to fulfill watchdog before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[9] = {'W',  0xDE, 0xAD, 0xBE, 0xEF,
                       0xFE, 0xEB, 0xDA, 0xED}; // 'W' is
                                                // the
@@ -179,6 +201,9 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
                  length);
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
 
     const size_t chunk_bytes =
         std::min(static_cast<size_t>(SPI_MAX_DMA_LEN), length);
@@ -256,6 +281,9 @@ void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
                  y, length, expected_row_bytes);
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
 
     uint8_t buf[expected_row_bytes];
     uint16_t buf_len = 0;
@@ -303,6 +331,9 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
                  "Tried to set output brightness before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[7];
     uint8_t buf_len = 0;
 
@@ -360,6 +391,9 @@ void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g,
                  "Tried to set output brightness before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[4];
     uint8_t buf_len = 0;
 
@@ -402,6 +436,9 @@ void MatrixPanel_FPGA_SPI::do_clearScreen_() {
                  "Tried to set output brightness before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[1];
     uint8_t buf_len = 0;
 
@@ -439,6 +476,9 @@ void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
                  "Tried to set output brightness before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[2];
     uint8_t buf_len = 0;
 
@@ -481,6 +521,9 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
                  "Tried to set output brightness before begin()");
         return;
     }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
     uint8_t buf[10];
     uint8_t buf_len = 0;
     // x1, y1, width,
@@ -659,6 +702,12 @@ void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     gpio_reset_pin((gpio_num_t)cfg.gpio.ce);
     spi_bus_initialize(HSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
     spi_bus_add_device(HSPI_HOST, &devcfg, &spi_bus);
+    if (!spi_mutex_) {
+        spi_mutex_ = xSemaphoreCreateMutex();
+        if (!spi_mutex_) {
+            ESP_LOGE("spi_init", "Failed to create SPI mutex");
+        }
+    }
     initialized = true;
     ESP_LOGD("spi_init", "done");
 }
