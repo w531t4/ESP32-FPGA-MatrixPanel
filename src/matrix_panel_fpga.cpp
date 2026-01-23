@@ -498,6 +498,81 @@ bool MatrixPanel_FPGA_SPI::worker_is_idle() const {
     return uxQueueMessagesWaiting(tx_q_) == 0 && !worker_busy_;
 }
 
+void MatrixPanel_FPGA_SPI::do_drawColumnRGB888_(int16_t x, const uint8_t *data,
+                                                size_t length) {
+    if (!initialized) {
+        ESP_LOGI("drawColumnRGB888()",
+                 "Tried to set output brightness before begin()");
+        return;
+    }
+    if (data == nullptr) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawColumnRGB888",
+                 "Invalid data passed to drawColumnRGB888 nullptr! (length=%d)",
+                 length);
+        return;
+    }
+    if (x < 0 || x >= width()) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawColumnRGB888",
+                 "Invalid column x=%d", x);
+        return;
+    }
+    const size_t expected_len =
+        static_cast<size_t>(height()) * static_cast<size_t>(3);
+    if (length != expected_len) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawColumnRGB888",
+                 "Invalid data length=%d expected=%d", length, expected_len);
+        return;
+    }
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return;
+    if (!wait_for_fpga_resetstatus_())
+        return;
+
+    uint8_t header_len = 0;
+    uint8_t header[3];
+    header[header_len++] = 'K'; // Command byte
+    if (PIXELS_PER_ROW <= 0xff) {
+        header[header_len++] = static_cast<uint8_t>(x);
+    } else {
+        header[header_len++] = static_cast<uint8_t>((x >> 8) & 0xFF);
+        header[header_len++] = static_cast<uint8_t>(x & 0xFF);
+    }
+
+    const size_t total_bytes = length + header_len;
+    uint8_t buf[total_bytes];
+    memcpy(buf, header, header_len);
+    memcpy(&buf[header_len], data, length);
+
+    spi_transaction_t t = {
+        .length = static_cast<size_t>(total_bytes * 8), // bits
+        .tx_buffer = buf,
+    };
+    esp_err_t err = spi_device_transmit(spi_bus, &t);
+    if (err != ESP_OK) {
+        ESP_LOGE("MatrixPanel_FPGA_SPI:drawColumnRGB888",
+                 "SPI transmit failed: %s", esp_err_to_name(err));
+        return;
+    }
+    wait_for_fpga_busy_clear_();
+}
+
+void MatrixPanel_FPGA_SPI::drawColumnRGB888(int16_t x, const uint8_t *data,
+                                            size_t length) {
+    if (use_worker_) {
+        if (!tx_q_ || !tx_task_)
+            return;
+        Job j;
+        j.op = Op::DRAW_COL;
+        j.x = x;
+        j.data = data;
+        j.length = length;
+        (void)xQueueSend(tx_q_, &j, 0);
+        return;
+    }
+    do_drawColumnRGB888_(x, data, length);
+}
+
 void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
                                                uint8_t g, uint8_t b) {
     if (!initialized) {
@@ -841,7 +916,7 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     // - red top band drawn through drawRowRGB888
     // - green bottom band via fillRect
     // - blue center band via fillRect
-    // - yellow left column, magenta right column for edge accents
+    // - yellow left band + magenta right band via drawColumnRGB888
     // - opposing diagonals (orange/white) to cover drawPixelRGB888
     // - centered drawRectRGB888 rect: size=max(4, width/5)xmax(4, height/3)
     //      BLACK        GRADIANT         RED
@@ -888,14 +963,31 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     fillRect(0, middle_y, width, horizontal_band_height, 0x00, 0x00, 0xFF);
     delay_if_needed();
 
-    // Left accent column: yellow.
-    fillRect(0, 0, vertical_bar_width, height, 0xFF, 0xFF, 0x33);
+    // Left accent band: yellow using drawColumnRGB888.
+    std::vector<uint8_t> column_buf(static_cast<size_t>(height) * 3);
+    for (int y = 0; y < height; ++y) {
+        const size_t idx = static_cast<size_t>(y) * 3;
+        column_buf[idx] = 0xFF;
+        column_buf[idx + 1] = 0xFF;
+        column_buf[idx + 2] = 0x33;
+    }
+    for (int x = 0; x < vertical_bar_width; ++x) {
+        drawColumnRGB888(x, column_buf.data(), column_buf.size());
+    }
     wait_for_worker_idle();
     delay_if_needed();
 
-    // Right accent column: magenta/pink.
-    fillRect(std::max(width - vertical_bar_width, 0), 0, vertical_bar_width, height,
-             0xFF, 0x00, 0xFF);
+    // Right accent band: magenta using drawColumnRGB888.
+    for (int y = 0; y < height; ++y) {
+        const size_t idx = static_cast<size_t>(y) * 3;
+        column_buf[idx] = 0xFF;
+        column_buf[idx + 1] = 0x00;
+        column_buf[idx + 2] = 0xFF;
+    }
+    const int right_start = std::max(width - vertical_bar_width, 0);
+    for (int x = right_start; x < width; ++x) {
+        drawColumnRGB888(x, column_buf.data(), column_buf.size());
+    }
     wait_for_worker_idle();
     delay_if_needed();
 
