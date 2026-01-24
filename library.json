@@ -1,6 +1,6 @@
 {
     "name": "ESP32-FPGA-MatrixPanel",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "description": "C++ driver for operating fpga_led_display via SPI.",
     "keywords": "hub75, esp32, spi, fpga, rgb matrix",
     "repository": {
