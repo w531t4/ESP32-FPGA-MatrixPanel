@@ -84,6 +84,14 @@ class MatrixPanel_FPGA_SPI {
     void fulfillWatchdog();
     void resync_after_fpga_reset(uint8_t brightness);
     bool consume_fpga_reset();
+    // Non-blocking readiness probe: false while the FPGA is held in
+    // reset/config (e.g. a remote JTAG reflash). Reads the same pin/level that
+    // consume_fpga_reset() checks; always true when RESETSTATUS is not wired.
+    inline bool fpga_ready() const {
+        if (!fpga_resetstatus_configured_)
+            return true;
+        return gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) != 0;
+    }
     uint32_t get_reset_epoch() const { return reset_epoch_; }
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
