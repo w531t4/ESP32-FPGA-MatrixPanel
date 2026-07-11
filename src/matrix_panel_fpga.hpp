@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "matrix_panel_fpga_config.hpp"
+#include <atomic>
 #include <stdint.h>
 
 /***************************************************************************************/
@@ -182,8 +183,8 @@ class MatrixPanel_FPGA_SPI {
     bool config_set = false;
     bool fpga_resetstatus_configured_ = false;
     bool fpga_busy_configured_ = false;
-    volatile bool fpga_reset_seen_ = false;
-    uint32_t reset_epoch_ = 0;
+    std::atomic<bool> fpga_reset_seen_{false};
+    std::atomic<uint32_t> reset_epoch_{0};
     volatile bool worker_busy_ = false;
     SemaphoreHandle_t spi_mutex_ = nullptr;
 
