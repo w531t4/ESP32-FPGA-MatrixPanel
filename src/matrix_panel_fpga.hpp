@@ -18,7 +18,7 @@ class MatrixPanel_FPGA_SPI {
     MatrixPanel_FPGA_SPI() {}
     MatrixPanel_FPGA_SPI(const FPGA_SPI_CFG &opts) { setCfg(opts); }
 
-    void init_spi(const FPGA_SPI_CFG &cfg);
+    esp_err_t init_spi(const FPGA_SPI_CFG &cfg);
     /* Propagate the DMA pin configuration, allocate DMA buffs and start data
      * output, initially blank */
     bool begin() {
@@ -42,16 +42,14 @@ class MatrixPanel_FPGA_SPI {
             return false;
         }
 
-        init_spi(m_cfg);
+        if (init_spi(m_cfg) != ESP_OK) {
+            ESP_LOGE("begin()", "MatrixPanel_FPGA_SPI::begin() failed!");
+            return false;
+        }
         init_fpga_resetstatus_gpio_();
         init_fpga_busy_gpio_();
 
         start_worker();
-        while (!initialized)
-            ;
-        if (!initialized) {
-            ESP_LOGE("being()", "MatrixPanel_FPGA_SPI::begin() failed!");
-        }
         return initialized;
     }
 
