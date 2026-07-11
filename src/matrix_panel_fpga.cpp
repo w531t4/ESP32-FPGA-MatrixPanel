@@ -39,6 +39,7 @@ void MatrixPanel_FPGA_SPI::do_swapFrame_() {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[1];
@@ -81,6 +82,7 @@ void MatrixPanel_FPGA_SPI::do_fulfillWatchdog_() {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[9] = {'W',  0xDE, 0xAD, 0xBE, 0xEF,
@@ -248,6 +250,7 @@ void MatrixPanel_FPGA_SPI::do_drawFrameRGB888_(const uint8_t *data,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
 
@@ -548,6 +551,7 @@ void MatrixPanel_FPGA_SPI::do_drawRowRGB888_(const uint8_t y,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
 
@@ -687,6 +691,7 @@ void MatrixPanel_FPGA_SPI::do_drawPixelRGB888_(int16_t x, int16_t y, uint8_t r,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[7];
@@ -749,6 +754,7 @@ void MatrixPanel_FPGA_SPI::do_fillScreenRGB888_(uint8_t r, uint8_t g,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[4];
@@ -839,6 +845,7 @@ void MatrixPanel_FPGA_SPI::do_clearScreen_() {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[1];
@@ -881,6 +888,7 @@ void MatrixPanel_FPGA_SPI::do_setBrightness8_(const uint8_t b) {
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[2];
@@ -928,6 +936,7 @@ void MatrixPanel_FPGA_SPI::do_fillRect_(int16_t x, int16_t y, int16_t w,
     }
     SpiLockGuard spi_lock(this);
     if (!spi_lock.locked())
+        return;
     if (!wait_for_fpga_resetstatus_())
         return;
     uint8_t buf[10];
