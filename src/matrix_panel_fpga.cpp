@@ -1152,7 +1152,7 @@ void MatrixPanel_FPGA_SPI::run_test_graphic(uint32_t delay_ms) {
     delay_if_needed();
 }
 
-void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
+esp_err_t MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     ESP_LOGD("spi_init", "using core=%d", xPortGetCoreID());
     spi_bus_config_t buscfg = {
         .mosi_io_num = (gpio_num_t)cfg.gpio.mosi,
@@ -1177,14 +1177,30 @@ void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     gpio_reset_pin((gpio_num_t)cfg.gpio.ce);
     // SPI2_HOST exists on all ESP32 targets; on legacy ESP32 it is the same
     // host HSPI_HOST aliased (the alias does not exist on ESP32-S3).
-    spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
-    spi_bus_add_device(SPI2_HOST, &devcfg, &spi_bus);
+    esp_err_t err = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    if (err != ESP_OK) {
+        ESP_LOGE("spi_init", "spi_bus_initialize failed: %s",
+                 esp_err_to_name(err));
+        return err;
+    }
+    err = spi_bus_add_device(SPI2_HOST, &devcfg, &spi_bus);
+    if (err != ESP_OK) {
+        ESP_LOGE("spi_init", "spi_bus_add_device failed: %s",
+                 esp_err_to_name(err));
+        spi_bus_free(SPI2_HOST);
+        return err;
+    }
     if (!spi_mutex_) {
         spi_mutex_ = xSemaphoreCreateMutex();
         if (!spi_mutex_) {
             ESP_LOGE("spi_init", "Failed to create SPI mutex");
+            spi_bus_remove_device(spi_bus);
+            spi_bus = nullptr;
+            spi_bus_free(SPI2_HOST);
+            return ESP_ERR_NO_MEM;
         }
     }
     initialized = true;
     ESP_LOGD("spi_init", "done");
+    return ESP_OK;
 }
