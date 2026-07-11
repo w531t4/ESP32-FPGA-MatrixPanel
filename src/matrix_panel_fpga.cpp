@@ -7,8 +7,9 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include <algorithm>
-#include <vector>
+#include <cstddef>
 #include <cstring>
+#include <vector>
 
 void IRAM_ATTR MatrixPanel_FPGA_SPI::fpga_resetstatus_isr_(void *arg) {
     auto *self = static_cast<MatrixPanel_FPGA_SPI *>(arg);
@@ -200,6 +201,9 @@ bool MatrixPanel_FPGA_SPI::consume_fpga_reset() {
     if (!fpga_reset_seen_.exchange(false))
         return false;
     reset_epoch_++;
+    // FPGA reset restarts the status mailbox at seq 0; forget the old seq so
+    // the next readStatus doesn't reject a genuinely fresh frame as stale.
+    have_last_seq_ = false;
     return true;
 }
 
@@ -1215,4 +1219,129 @@ esp_err_t MatrixPanel_FPGA_SPI::init_spi_bus_device_(
         return err;
     }
     return ESP_OK;
+}
+
+esp_err_t MatrixPanel_FPGA_SPI::init_status_spi_(const FPGA_SPI_CFG &cfg) {
+    if (cfg.status_gpio.sck < 0 || cfg.status_gpio.cs < 0 ||
+        cfg.status_gpio.miso < 0)
+        return ESP_OK; // feature not configured
+    spi_bus_config_t buscfg = {
+        .mosi_io_num = -1, // responder is TX-only
+        .miso_io_num = (gpio_num_t)cfg.status_gpio.miso,
+        .sclk_io_num = (gpio_num_t)cfg.status_gpio.sck,
+        .quadwp_io_num = -1,
+        .quadhd_io_num = -1,
+    };
+    // The responder synchronizes cs_n through 2 flip-flops (~160 ns) before
+    // it presents the first frame byte, so CS must assert well before the
+    // first clock edge or byte 0 is lost. cs_ena_pretrans provides that setup
+    // time (half-duplex only) and is measured in SPI bit-cycles, so derive
+    // the count from the clock: >= 500 ns of setup, ceil-rounded. The
+    // hardware caps the field at 16 cycles, which keeps >= 500 ns up to
+    // 32 MHz (and still >= 160 ns to 100 MHz).
+    constexpr uint64_t kCsSetupNs = 500;
+    const uint16_t cs_setup_cycles = (uint16_t)std::min<uint64_t>(
+        16, (kCsSetupNs * cfg.status_spispeed + 999999999) / 1000000000);
+    spi_device_interface_config_t devcfg = {
+        .mode = 3, // CPOL=1/CPHA=1 per reg_spi_responder
+        .cs_ena_pretrans = cs_setup_cycles,
+        .clock_speed_hz = (int)cfg.status_spispeed,
+        .spics_io_num = (gpio_num_t)cfg.status_gpio.cs,
+        .flags = SPI_DEVICE_HALFDUPLEX | SPI_DEVICE_NO_DUMMY,
+        .queue_size = 1,
+    };
+    gpio_reset_pin((gpio_num_t)cfg.status_gpio.sck);
+    gpio_reset_pin((gpio_num_t)cfg.status_gpio.cs);
+    gpio_reset_pin((gpio_num_t)cfg.status_gpio.miso);
+    // 12-byte frames don't need DMA; disabling it allows a stack rx buffer.
+    esp_err_t err = init_spi_bus_device_(SPI3_HOST, buscfg, devcfg,
+                                         SPI_DMA_DISABLED, status_spi_dev_);
+    if (err == ESP_OK)
+        status_spi_configured_ = true;
+    return err;
+}
+
+// CRC-16/XMODEM (poly 0x1021, init 0, no reflection, no final xor); matches
+// the FPGA's crc16.sv over the 10-byte frame body.
+static constexpr uint16_t crc16_xmodem_(const uint8_t *d, size_t n) {
+    uint16_t crc = 0;
+    while (n--) {
+        crc ^= (uint16_t)(*d++ << 8);
+        for (int i = 0; i < 8; ++i)
+            crc = crc & 0x8000 ? (uint16_t)((crc << 1) ^ 0x1021)
+                               : (uint16_t)(crc << 1);
+    }
+    return crc;
+}
+static constexpr uint8_t kCrcCheckInput[] = {'1', '2', '3', '4', '5',
+                                             '6', '7', '8', '9'};
+static_assert(crc16_xmodem_(kCrcCheckInput, 9) == 0x31C3,
+              "CRC-16/XMODEM self-check failed");
+
+bool MatrixPanel_FPGA_SPI::readStatus(uint8_t addr, uint64_t &value) {
+    constexpr int kRetries = 3;
+    if (!initialized || !status_spi_configured_ || addr == STATUS_ADDR_NONE) {
+        last_status_error_ = StatusReadError::NOT_CONFIGURED;
+        return false;
+    }
+    // One lock spans request and readback so no other 'S' can interleave.
+    SpiLockGuard spi_lock(this);
+    if (!spi_lock.locked())
+        return false;
+    if (!wait_for_fpga_resetstatus_())
+        return false;
+    // Outer: re-issue the request (command lost / stale seq / wrong echo).
+    for (int req = 0; req < kRetries; req++) {
+        uint8_t cmd[2] = {'S', addr};
+        spi_transaction_t tc = {
+            .length = 8 * sizeof(cmd), // spi_transaction_t.length is in bits
+            .tx_buffer = cmd,
+        };
+        if (spi_device_transmit(spi_bus, &tc) != ESP_OK) {
+            last_status_error_ = StatusReadError::CMD_TX_ERROR;
+            continue;
+        }
+        // Inner: re-read only; a CRC failure is a clock-domain tear and the
+        // responder re-frames the same mailbox on each CS assertion.
+        for (int rd = 0; rd < kRetries; rd++) {
+            StatusFrame frame;
+            // Half-duplex RX-only: length is the (empty) TX phase, rxlength
+            // is the RX phase. Both are in bits.
+            spi_transaction_t tr = {
+                .length = 0,
+                .rxlength = 8 * sizeof(frame),
+                .rx_buffer = &frame,
+            };
+            if (spi_device_transmit(status_spi_dev_, &tr) != ESP_OK) {
+                last_status_error_ = StatusReadError::BUS_RX_ERROR;
+                continue;
+            }
+            memcpy(last_status_frame_, &frame, sizeof(frame));
+            // CRC covers every field before the crc member.
+            if (crc16_xmodem_(reinterpret_cast<const uint8_t *>(&frame),
+                              offsetof(StatusFrame, crc)) !=
+                (uint16_t)((frame.crc[0] << 8) | frame.crc[1])) {
+                last_status_error_ = StatusReadError::CRC_MISMATCH;
+                continue;
+            }
+            if (frame.addr != addr) {
+                last_status_error_ = StatusReadError::ADDR_MISMATCH;
+                break; // mailbox holds another request; re-issue ours
+            }
+            if (have_last_seq_ && frame.seq == last_seq_) {
+                last_status_error_ = StatusReadError::STALE_SEQ;
+                break; // stale: our request not latched yet; re-issue
+            }
+            last_seq_ = frame.seq;
+            have_last_seq_ = true;
+            last_status_error_ = StatusReadError::NONE;
+            value = 0;
+            for (size_t i = 0; i < sizeof(frame.value); i++)
+                value = (value << 8) | frame.value[i];
+            return true;
+        }
+    }
+    ESP_LOGW("readStatus", "no fresh frame for addr 0x%02X (%s)", addr,
+             status_error_str(last_status_error_));
+    return false;
 }
