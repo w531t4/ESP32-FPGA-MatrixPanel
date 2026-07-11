@@ -9,6 +9,7 @@
 #include "freertos/semphr.h"
 #include "matrix_panel_fpga_config.hpp"
 #include <atomic>
+#include <cstring>
 #include <stdint.h>
 
 /***************************************************************************************/
@@ -46,6 +47,22 @@ class MatrixPanel_FPGA_SPI {
         if (init_spi(m_cfg) != ESP_OK) {
             ESP_LOGE("begin()", "MatrixPanel_FPGA_SPI::begin() failed!");
             return false;
+        }
+        if (init_status_spi_(m_cfg) != ESP_OK) {
+            ESP_LOGW("begin()", "status SPI init failed; readback disabled");
+        } else if (status_spi_configured_) {
+            ESP_LOGI("begin()", "Using GPIO %d for STATUS_SPI_SCK_PIN",
+                     m_cfg.status_gpio.sck);
+            ESP_LOGI("begin()", "Using GPIO %d for STATUS_SPI_CS_PIN",
+                     m_cfg.status_gpio.cs);
+            ESP_LOGI("begin()", "Using GPIO %d for STATUS_SPI_MISO_PIN",
+                     m_cfg.status_gpio.miso);
+            ESP_LOGI("begin()",
+                     "Status SPI ready on SPI3_HOST (mode 3, %u Hz)",
+                     (unsigned)m_cfg.status_spispeed);
+        } else {
+            ESP_LOGI("begin()",
+                     "Status SPI disabled (STATUS_SPI pins not configured)");
         }
         init_fpga_resetstatus_gpio_();
         init_fpga_busy_gpio_();
@@ -92,6 +109,84 @@ class MatrixPanel_FPGA_SPI {
         return gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) != 0;
     }
     uint32_t get_reset_epoch() const { return reset_epoch_; }
+    // Status readback registers; mirrors status_addr_e in the FPGA's
+    // packages/types.sv -- keep in sync.
+    static constexpr uint8_t STATUS_ADDR_FLAGS = 0x00;
+    static constexpr uint8_t STATUS_ADDR_RGB = 0x01;
+    static constexpr uint8_t STATUS_ADDR_BRIGHTNESS = 0x02;
+    static constexpr uint8_t STATUS_ADDR_NONE = 0xFF; // reserved sentinel
+    struct FpgaStatusFlags {
+        bool fpga_ready, ctrl_busy, ctrl_ready_for_data;
+    };
+    // Field sizes of the responder's mailbox frame; mirror the STATUS_*_BYTES
+    // parameters in the FPGA's packages/params.sv. addr and seq are single
+    // bytes (scalar members below).
+    static constexpr size_t STATUS_VALUE_LEN = 8;
+    static constexpr size_t STATUS_CRC_LEN = 2;
+    // Wire format of the frame: field order/offsets come from member order,
+    // sizes from the constants above. Multi-byte fields are MSB-first on the
+    // wire. All members are bytes, so the struct matches the wire layout
+    // exactly (packed guards against any padding).
+    struct __attribute__((packed)) StatusFrame {
+        uint8_t addr; // echo of the requested register (0xFF = never latched)
+        uint8_t seq;  // mailbox latch counter
+        uint8_t value[STATUS_VALUE_LEN]; // register value, MSB first
+        uint8_t crc[STATUS_CRC_LEN]; // CRC-16/XMODEM over addr..value, MSB 1st
+    };
+    static constexpr size_t STATUS_FRAME_LEN = sizeof(StatusFrame);
+    // Why the most recent readStatus() attempt failed (or NONE on success).
+    // When several retries fail for different reasons, the last one wins.
+    enum class StatusReadError : uint8_t {
+        NONE = 0,
+        NOT_CONFIGURED,  // status bus disabled or begin() not run
+        CMD_TX_ERROR,    // READSTATUS command failed on the main bus
+        BUS_RX_ERROR,    // frame transfer failed on the status bus
+        CRC_MISMATCH,    // frame corrupted (tear, floating MISO, bad wiring)
+        ADDR_MISMATCH,   // mailbox echoed a different register address
+        STALE_SEQ,       // frame valid but seq unchanged: request not latched
+    };
+    static const char *status_error_str(StatusReadError e) {
+        switch (e) {
+        case StatusReadError::NONE:
+            return "none";
+        case StatusReadError::NOT_CONFIGURED:
+            return "not configured";
+        case StatusReadError::CMD_TX_ERROR:
+            return "command TX failed (main bus)";
+        case StatusReadError::BUS_RX_ERROR:
+            return "frame RX failed (status bus)";
+        case StatusReadError::CRC_MISMATCH:
+            return "CRC mismatch";
+        case StatusReadError::ADDR_MISMATCH:
+            return "address echo mismatch";
+        case StatusReadError::STALE_SEQ:
+            return "stale seq (request not latched)";
+        }
+        return "unknown";
+    }
+    StatusReadError last_status_error() const { return last_status_error_; }
+    // Copies the raw bytes of the last frame clocked off the status bus
+    // (all zeros if no transfer has completed yet).
+    void last_status_frame(uint8_t out[STATUS_FRAME_LEN]) const {
+        memcpy(out, last_status_frame_, STATUS_FRAME_LEN);
+    }
+    bool status_spi_available() const { return status_spi_configured_; }
+    // Synchronous register readback over the status SPI. Sends ['S'][addr] on
+    // the command bus, clocks the 12-byte mailbox frame from the responder,
+    // validates CRC/echo/seq with retries. False if unavailable or no fresh
+    // frame.
+    bool readStatus(uint8_t addr, uint64_t &value);
+    bool readFlags(FpgaStatusFlags &out) {
+        uint64_t v;
+        if (!readStatus(STATUS_ADDR_FLAGS, v))
+            return false;
+        // FLAGS register bit layout, per the FPGA's display_core.sv:
+        // value[2:0] = {fpga_ready, ctrl_busy, ctrl_ready_for_data}
+        out.fpga_ready = (v >> 2) & 1;
+        out.ctrl_busy = (v >> 1) & 1;
+        out.ctrl_ready_for_data = (v >> 0) & 1;
+        return true;
+    }
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
     inline int16_t height() const { return m_cfg.mx_height; }
     void setBrightness8(const uint8_t b);
@@ -159,6 +254,7 @@ class MatrixPanel_FPGA_SPI {
     void do_swapFrame_();
     void do_fulfillWatchdog_();
     void do_setBrightness8_(const uint8_t b);
+    esp_err_t init_status_spi_(const FPGA_SPI_CFG &cfg);
     static esp_err_t init_spi_bus_device_(
         spi_host_device_t host, const spi_bus_config_t &buscfg,
         const spi_device_interface_config_t &devcfg, spi_dma_chan_t dma_chan,
@@ -189,6 +285,14 @@ class MatrixPanel_FPGA_SPI {
     bool fpga_busy_configured_ = false;
     std::atomic<bool> fpga_reset_seen_{false};
     std::atomic<uint32_t> reset_epoch_{0};
+    spi_device_handle_t status_spi_dev_ = nullptr;
+    bool status_spi_configured_ = false;
+    // Freshness tracking for readStatus (mailbox seq); cleared on FPGA reset.
+    std::atomic<bool> have_last_seq_{false};
+    uint8_t last_seq_ = 0;
+    // Diagnostics from the most recent readStatus() (guarded by spi_mutex_).
+    StatusReadError last_status_error_ = StatusReadError::NONE;
+    uint8_t last_status_frame_[STATUS_FRAME_LEN] = {};
     volatile bool worker_busy_ = false;
     SemaphoreHandle_t spi_mutex_ = nullptr;
 

@@ -20,6 +20,11 @@
 #define FPGA_RESETSTATUS_PIN_DEFAULT -1
 #define FPGA_BUSY_PIN_DEFAULT -1
 
+#define STATUS_SPI_SCK_PIN_DEFAULT -1
+#define STATUS_SPI_CS_PIN_DEFAULT -1
+#define STATUS_SPI_MISO_PIN_DEFAULT -1
+#define STATUS_SPI_SPEED_DEFAULT 2000000
+
 // Adapted from
 // ESP32-HUB75-MatrixPanel-DMA/src/ESP32-HUB75-MatrixPanel-I2S-DMA.h
 
@@ -101,6 +106,13 @@ struct FPGA_SPI_CFG {
     uint16_t fpga_resetstatus_timeout_ms;
     uint16_t fpga_busy_timeout_ms;
 
+    // Status readback SPI (FPGA reg_spi_responder, mode 3). ESP32 is master:
+    // sck/cs are outputs, miso is input. Disabled when any pin is -1.
+    struct status_spi_pins {
+        int8_t sck, cs, miso;
+    } status_gpio;
+    uint32_t status_spispeed;
+
     // struct constructor
     FPGA_SPI_CFG(
         uint16_t _w = MATRIX_WIDTH, uint16_t _h = MATRIX_HEIGHT,
@@ -111,11 +123,16 @@ struct FPGA_SPI_CFG {
         clk_speed _spispeed = HZ_8M, uint16_t _min_refresh_rate = 60,
         uint8_t _pixel_color_depth_bits = PIXEL_COLOR_DEPTH_BITS_DEFAULT,
         uint16_t _fpga_resetstatus_timeout_ms = 1000,
-        uint16_t _fpga_busy_timeout_ms = 1000)
+        uint16_t _fpga_busy_timeout_ms = 1000,
+        status_spi_pins _status_pinmap = {STATUS_SPI_SCK_PIN_DEFAULT,
+                                          STATUS_SPI_CS_PIN_DEFAULT,
+                                          STATUS_SPI_MISO_PIN_DEFAULT},
+        uint32_t _status_spispeed = STATUS_SPI_SPEED_DEFAULT)
         : mx_width(_w), mx_height(_h), chain_length(_chain), gpio(_pinmap),
           spispeed(_spispeed), min_refresh_rate(_min_refresh_rate),
           fpga_resetstatus_timeout_ms(_fpga_resetstatus_timeout_ms),
-          fpga_busy_timeout_ms(_fpga_busy_timeout_ms) {
+          fpga_busy_timeout_ms(_fpga_busy_timeout_ms),
+          status_gpio(_status_pinmap), status_spispeed(_status_spispeed) {
         setPixelColorDepthBits(_pixel_color_depth_bits);
     }
 
