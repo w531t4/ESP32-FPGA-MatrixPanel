@@ -1175,8 +1175,10 @@ void MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     gpio_reset_pin((gpio_num_t)cfg.gpio.mosi);
     gpio_reset_pin((gpio_num_t)cfg.gpio.clk);
     gpio_reset_pin((gpio_num_t)cfg.gpio.ce);
-    spi_bus_initialize(HSPI_HOST, &buscfg, SPI_DMA_CH_AUTO);
-    spi_bus_add_device(HSPI_HOST, &devcfg, &spi_bus);
+    // SPI2_HOST exists on all ESP32 targets; on legacy ESP32 it is the same
+    // host HSPI_HOST aliased (the alias does not exist on ESP32-S3).
+    spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
+    spi_bus_add_device(SPI2_HOST, &devcfg, &spi_bus);
     if (!spi_mutex_) {
         spi_mutex_ = xSemaphoreCreateMutex();
         if (!spi_mutex_) {
