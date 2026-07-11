@@ -197,7 +197,8 @@ bool MatrixPanel_FPGA_SPI::consume_fpga_reset() {
         return false;
     if (gpio_get_level((gpio_num_t)m_cfg.gpio.fpga_resetstatus) == 0)
         return false;
-    fpga_reset_seen_ = false;
+    if (!fpga_reset_seen_.exchange(false))
+        return false;
     reset_epoch_++;
     return true;
 }
