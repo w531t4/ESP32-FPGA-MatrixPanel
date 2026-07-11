@@ -159,6 +159,10 @@ class MatrixPanel_FPGA_SPI {
     void do_swapFrame_();
     void do_fulfillWatchdog_();
     void do_setBrightness8_(const uint8_t b);
+    static esp_err_t init_spi_bus_device_(
+        spi_host_device_t host, const spi_bus_config_t &buscfg,
+        const spi_device_interface_config_t &devcfg, spi_dma_chan_t dma_chan,
+        spi_device_handle_t &handle_out);
     void init_fpga_resetstatus_gpio_();
     void init_fpga_busy_gpio_();
     bool wait_for_fpga_resetstatus_();

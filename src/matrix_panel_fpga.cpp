@@ -1178,19 +1178,10 @@ esp_err_t MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     gpio_reset_pin((gpio_num_t)cfg.gpio.ce);
     // SPI2_HOST exists on all ESP32 targets; on legacy ESP32 it is the same
     // host HSPI_HOST aliased (the alias does not exist on ESP32-S3).
-    esp_err_t err = spi_bus_initialize(SPI2_HOST, &buscfg, SPI_DMA_CH_AUTO);
-    if (err != ESP_OK) {
-        ESP_LOGE("spi_init", "spi_bus_initialize failed: %s",
-                 esp_err_to_name(err));
+    esp_err_t err = init_spi_bus_device_(SPI2_HOST, buscfg, devcfg,
+                                         SPI_DMA_CH_AUTO, spi_bus);
+    if (err != ESP_OK)
         return err;
-    }
-    err = spi_bus_add_device(SPI2_HOST, &devcfg, &spi_bus);
-    if (err != ESP_OK) {
-        ESP_LOGE("spi_init", "spi_bus_add_device failed: %s",
-                 esp_err_to_name(err));
-        spi_bus_free(SPI2_HOST);
-        return err;
-    }
     if (!spi_mutex_) {
         spi_mutex_ = xSemaphoreCreateMutex();
         if (!spi_mutex_) {
@@ -1203,5 +1194,25 @@ esp_err_t MatrixPanel_FPGA_SPI::init_spi(const FPGA_SPI_CFG &cfg) {
     }
     initialized = true;
     ESP_LOGD("spi_init", "done");
+    return ESP_OK;
+}
+
+esp_err_t MatrixPanel_FPGA_SPI::init_spi_bus_device_(
+    spi_host_device_t host, const spi_bus_config_t &buscfg,
+    const spi_device_interface_config_t &devcfg, spi_dma_chan_t dma_chan,
+    spi_device_handle_t &handle_out) {
+    esp_err_t err = spi_bus_initialize(host, &buscfg, dma_chan);
+    if (err != ESP_OK) {
+        ESP_LOGE("spi_init", "spi_bus_initialize failed: %s",
+                 esp_err_to_name(err));
+        return err;
+    }
+    err = spi_bus_add_device(host, &devcfg, &handle_out);
+    if (err != ESP_OK) {
+        ESP_LOGE("spi_init", "spi_bus_add_device failed: %s",
+                 esp_err_to_name(err));
+        spi_bus_free(host);
+        return err;
+    }
     return ESP_OK;
 }
