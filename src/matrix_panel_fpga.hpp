@@ -114,6 +114,8 @@ class MatrixPanel_FPGA_SPI {
     static constexpr uint8_t STATUS_ADDR_FLAGS = 0x00;
     static constexpr uint8_t STATUS_ADDR_RGB = 0x01;
     static constexpr uint8_t STATUS_ADDR_BRIGHTNESS = 0x02;
+    // Rolling measurement of kilobytes/s received by the FPGA from the ESP32.
+    static constexpr uint8_t STATUS_ADDR_RX_KBPS = 0x03;
     static constexpr uint8_t STATUS_ADDR_NONE = 0xFF; // reserved sentinel
     struct FpgaStatusFlags {
         bool fpga_ready, ctrl_busy, ctrl_ready_for_data;
