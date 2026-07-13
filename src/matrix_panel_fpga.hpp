@@ -226,12 +226,12 @@ class MatrixPanel_FPGA_SPI {
         out.dirty = take(1);
         return true;
     }
-    // "1.2.3" at an exact clean tag, else "1.2.3+<commits>.sha<sha>" with a
+    // "v1.2.3" at an exact clean tag, else "v1.2.3+<commits>.sha<sha>" with a
     // "-dirty" suffix when the tree was dirty.
     static int formatVersion(const FpgaVersion &v, char *buf, size_t len) {
         if (v.commits == 0 && !v.dirty)
-            return snprintf(buf, len, "%u.%u.%u", v.major, v.minor, v.patch);
-        return snprintf(buf, len, "%u.%u.%u+%u.sha%08x%s", v.major, v.minor,
+            return snprintf(buf, len, "v%u.%u.%u", v.major, v.minor, v.patch);
+        return snprintf(buf, len, "v%u.%u.%u+%u.sha%08x%s", v.major, v.minor,
                         v.patch, v.commits, v.git_sha, v.dirty ? "-dirty" : "");
     }
     // read + format in one call; buf should be >= VERSION_STR_MAX.
