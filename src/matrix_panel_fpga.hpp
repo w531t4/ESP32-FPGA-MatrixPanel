@@ -9,6 +9,7 @@
 #include "freertos/semphr.h"
 #include "matrix_panel_fpga_config.hpp"
 #include <atomic>
+#include <cstdio>
 #include <cstring>
 #include <stdint.h>
 
@@ -116,10 +117,26 @@ class MatrixPanel_FPGA_SPI {
     static constexpr uint8_t STATUS_ADDR_BRIGHTNESS = 0x02;
     // Rolling measurement of kilobytes/s received by the FPGA from the ESP32.
     static constexpr uint8_t STATUS_ADDR_RX_KBPS = 0x03;
+    // HUB75 frame-emit rate, Hz, 5 s sliding average.
+    static constexpr uint8_t STATUS_ADDR_HUB75_FPS = 0x04;
+    // Framebuffer swap rate, /s, 5 s average (0 if !DOUBLE_BUFFER).
+    static constexpr uint8_t STATUS_ADDR_FB_FPS = 0x05;
+    // Whole seconds since reset (plain counter).
+    static constexpr uint8_t STATUS_ADDR_UPTIME = 0x06;
+    // Packed gateware version, decoded by readVersion() (mirrors reg_version.sv).
+    static constexpr uint8_t STATUS_ADDR_VERSION = 0x07;
     static constexpr uint8_t STATUS_ADDR_NONE = 0xFF; // reserved sentinel
     struct FpgaStatusFlags {
         bool fpga_ready, ctrl_busy, ctrl_ready_for_data;
     };
+    // Decoded STATUS_ADDR_VERSION; widths mirror version_t in reg_version.sv.
+    struct FpgaVersion {
+        uint8_t major, minor, patch; // each <= 127
+        uint32_t git_sha;            // high 32 bits of the HEAD hash
+        uint16_t commits;            // since the tag, <= 1023
+        bool dirty;
+    };
+    static constexpr size_t VERSION_STR_MAX = 40; // >= any formatVersion() output
     // Field sizes of the responder's mailbox frame; mirror the STATUS_*_BYTES
     // parameters in the FPGA's packages/params.sv. addr and seq are single
     // bytes (scalar members below).
@@ -187,6 +204,42 @@ class MatrixPanel_FPGA_SPI {
         out.fpga_ready = (v >> 2) & 1;
         out.ctrl_busy = (v >> 1) & 1;
         out.ctrl_ready_for_data = (v >> 0) & 1;
+        return true;
+    }
+    bool readVersion(FpgaVersion &out) {
+        uint64_t v;
+        if (!readStatus(STATUS_ADDR_VERSION, v))
+            return false;
+        // version_t is packed MSB-first (reg_version.sv); take() consumes the
+        // fields in declaration order, widths matching the SV logic[] sizes
+        // (7+7+7+32+10+1 = 64).
+        unsigned pos = 0;
+        auto take = [&](unsigned width) {
+            pos += width;
+            return (uint32_t)((v >> (64 - pos)) & ((1ull << width) - 1));
+        };
+        out.major = take(7);
+        out.minor = take(7);
+        out.patch = take(7);
+        out.git_sha = take(32);
+        out.commits = take(10);
+        out.dirty = take(1);
+        return true;
+    }
+    // "1.2.3" at an exact clean tag, else "1.2.3+<commits>.sha<sha>" with a
+    // "-dirty" suffix when the tree was dirty.
+    static int formatVersion(const FpgaVersion &v, char *buf, size_t len) {
+        if (v.commits == 0 && !v.dirty)
+            return snprintf(buf, len, "%u.%u.%u", v.major, v.minor, v.patch);
+        return snprintf(buf, len, "%u.%u.%u+%u.sha%08x%s", v.major, v.minor,
+                        v.patch, v.commits, v.git_sha, v.dirty ? "-dirty" : "");
+    }
+    // read + format in one call; buf should be >= VERSION_STR_MAX.
+    bool readVersionString(char *buf, size_t len) {
+        FpgaVersion v;
+        if (!readVersion(v))
+            return false;
+        formatVersion(v, buf, len);
         return true;
     }
     inline int16_t width() const { return m_cfg.mx_width * m_cfg.chain_length; }
